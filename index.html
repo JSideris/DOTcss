@@ -1,0 +1,161 @@
+<!DOCTYPE HTML>
+
+<html>
+
+<link rel="stylesheet" type="text/css" href="bootstrap.min.css">
+<link rel="stylesheet" type="text/css" href="bootstrap-theme.min.css">
+<link rel="stylesheet" type="text/css" href="dothtml.ui.css">
+<link rel="stylesheet" type="text/css" href="./prettify.css">
+<link rel="stylesheet" type="text/css" href="style.css">
+
+<script src="jquery.js"></script>
+<script src="Sequencr.js"></script>
+<script src="bootstrap.min.js"></script>
+<script src="dothtml.js"></script>
+<script src="dotcss.js"></script>
+<script src="dothtml.ui.js"></script>
+<script src="beautify-html.js"></script>
+
+<body></body>
+
+<script>
+
+var cssAnimationStarted = false;
+
+function doRandomStuffToElement(element){
+	/*if(Math.random() < 0.9){
+		var numericFontSize = Number((element.style.fontSize || "128px").split("px")[0]);
+		numericFontSize += Math.floor(Math.random() * 2) * 2 - 1;
+		element.style.fontSize = (numericFontSize) + "px";
+	}*/
+	if(Math.random() < 0.1){
+		//dotcss(element).color(Math.random() * 127, Math.random() * 64, Math.random() * 256);
+		dotcss(element).color.animate([Math.random() * 127, Math.random() * 64, Math.random() * 256]);
+		//dotcss(element).color.animate([Math.random() * 256, Math.random() * 256, Math.random() * 256]);
+		//dotcss(element).color.animate([0, 0, 256]);
+	}
+	/*if(Math.random() < 0.2){
+		var bw = Math.random() * 256;
+		dotcss(element).backgroundColor.animate([bw, bw, bw, Math.random() * 0.9]);
+	}*/
+	if(Math.random() < 0.1){
+		dotcss(element).textDecoration(Math.random() < 0.1 ? "underline" : "none");
+	}
+}
+
+Sequencr.do(function(){
+	if(cssAnimationStarted){
+		doRandomStuffToElement($("#logoC")[0]);
+		setTimeout(function(){doRandomStuffToElement($("#logoS1")[0]);}, 100/3);
+		setTimeout(function(){doRandomStuffToElement($("#logoS2")[0]);}, 100*2/3);
+	}
+}, 100);
+
+dot("body")
+.div("&copy;2017 - Joshua Sideris").style(dotcss.position("fixed").right(10).bottom(10).color(0x9638527).lineHeight(20))
+.div(dot
+	.div(
+		dot.div("&lt;style&gt;").class("logoinittag").wait(1000, function(){
+			return dot.$hide(500);
+		})
+		.div(
+			dot.wait(1500, function(){
+				return dot.$show(300, function(){
+					return dot.wait(500, function(){
+						return dot.$animate({width: 256, height: 256, marginTop: 0}, 500, "swing", dot.h("DOT"));
+					});
+				});
+			})
+		).id("logodotsmall").style(dotcss.display("none").marginTop(80))
+		.div(dot.span("c").id("logoC").span("s").id("logoS1").span("s").id("logoS2")).id("logohtml")
+		.div("&lt;/style&gt;").class("logoinittag").wait(1000, function(){
+			return dot.$hide(500);
+		})
+	).id("logo")
+	.br()
+	.br()
+	.div("A better way to build dynamic client-side CSS.").id("slogan").$css("opacity", "0.1").wait(3000, function(){
+		cssAnimationStarted = true;
+		return dot.$animate({opacity: 1}, 500, "swing");
+	})
+).id("header")
+	.div(
+	dot.tabs(
+		[
+			dot.tab("DOTcss", "main",
+				dot.div(
+					dot.div("Get DOTcss.")
+					.br()
+					.a("Download DOThtml").href("https://github.com/JSideris/DOThtml/releases/download/v1.2.0/dothtml.js").target("_blank").class("btn btn-primary download-dot-button")//.download()
+				).id("download-dot-banner")
+				.hr()
+					.h1("DOThtml - The best open-source client-side page buider.")
+				.hr()
+					.h1("Check out a few sites built with DOThtml.")
+						.div(
+						).class("showcase-site-list")
+				//.featurepreview("", "Lots of fun to use!")
+			), 
+			dot.tab("Getting Started", "start",
+				dot.h1("Getting Started")
+				.h2("Download")
+				.div(
+					dot
+					.div("Download version 1.2.0").class("btn btn-primary").style(dotcss.position("absolute").left(0).widthP(40)).onclick(function(){ window.open("https://github.com/JSideris/DOThtml/releases/download/v1.2.0/dothtml.js"); })
+					.div("Or check it out on GitHub").class("btn btn-info").style(dotcss.position("absolute").right(0).widthP(40)).onclick(function(){ window.open("https://github.com/JSideris/DOThtml")})
+				).style(dotcss.position("relative").width("100%").height(32))
+				.h2("Learn")
+				.h("Check back later for a video tutorial!.")
+				.h2("Basic Usage")
+				
+			),
+			dot.tab("Plugins & Addons", "plugins",
+				dot.h1("This documentation is not complete yet. Please check back later!")
+			), 
+			dot.tab("Compatibility & Support", "support",
+				dot.h1("Browser Compatibility")
+				.h("Maximum forward-and-backward browser compatibility is a priority of DOThtml. Please refer to the following table for more information on browser compatibility testing. Browser testing is an ongoing chore but here are the results of the latest tests. Browsers with a checkmark have passed all test cases. Version numbers are in the following format: \"browser-version | latest-DOThtml-version-tested\"")
+				.div(
+					dot.each([
+						{name: "Chrome", versionData: [{b: "57", d: "1.2.1"}, {b: "56", d: "1.2.1"}]}, 
+						{name: "Edge", versionData: [{b: "38", d: "1.2.1"}]},
+						{name: "Internet Explorer", versionData: [{b: "11", d: "1.2.1"}]},
+						//{name: "Safari", versionData: [{b: "", d: "1.2.1"}]}, 
+						{name: "Firefox", versionData: [{b: "51", d: "1.2.1"}]}, 
+						{name: "Android Browser", versionData: [{b: "", d: "1.2.1"}]}, 
+						//{name: "Opera", versionData: [{b: "", d: "1.2.1"}]},
+						{name: "BlackBerry Browser", versionData: [{b: "OS 10.3", d: "1.2.1"}]},
+						//{name: "Sea Monkey", versionData: [{b: "", d: "1.2.1"}]},
+						//{name: "K-Meleon", versionData: [{b: "", d: "1.2.1"}]},
+						//{name: "OmniWeb", versionData: [{b: "", d: "1.2.1"}]},
+						//{name: "iCab", versionData: [{b: "", d: "1.2.1"}]},
+						//{name: "Konqueror", versionData: [{b: "", d: "1.2.1"}]},
+						//{name: "Epiphany", versionData: [{b: "", d: "1.2.1"}]},
+					], function(row){
+						return dot.div(
+							dot.div(row.name).style(dotcss.fontWeight("bold").display("inline-block").padding(8).borderRight("2px solid black").marginRight(4))
+							.each(row.versionData, function(versionDatum){
+								return dot.div(versionDatum.b + " | " + versionDatum.d).style(dotcss.fontStyle("italic").backgroundColor(0xAAFFAA).display("inline-block").padding(4).border("1px solid black"))
+							})
+						).style(dotcss.whiteSpace("nowrap"));
+					})
+				).style(dotcss.widthP(100)/*.height(1024)*/.overflowX("scroll").backgroundColor(200, 200, 200).padding(8))
+
+				.h("To test DOThtml on any JavaScript-enabled browser, simply visit the <a href=\"./unittests/tests.html\" target=\"_blank\">test case page</a>.")
+
+				.h1("What about SEO?")
+				.h("You might be wondering if using dynamic content will affect the way that search engines index your website. First, know that <a href=\"http://searchengineland.com/tested-googlebot-crawls-javascript-heres-learned-220157\" target=\"_blank\">testing has been done which validated the effectiveness of Googlebot on dynamically generated content</a>, revealing that Google actually waits for the entire page to render before reading the DOM.").br().br()
+				.h("You should also be aware that DOThtml is not the only dynamic page builder. The most popular library designed specifically for dynamic JavaScript-based page building (and the second most popular JavaScript library aside from JQuery itself) is JQuery-UI, which has been around for a decade and is used by almost 200 000 of the world's top 1 000 000 websites.").br().br()
+				.h("Having a dynamic website can actually increase your site's SEO score in a number of ways, for instance, by reducing your bounce rate, or by katering to accessibility and mobile-friendliness. Interactive, dynamic web applications are the future and are worth not overlooking.")
+			), 
+			dot.tab("Donate", "donate",
+				dot.h1("This documentation is not complete yet. Please check back later!")
+			)
+		]
+	)
+).class("container");
+
+</script>
+
+<script type="text/javascript" src="run_prettify.js"></script>
+</html>
