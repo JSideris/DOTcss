@@ -1,4 +1,4 @@
-//Version 0.1 Beta.
+//Version 0.2 Beta.
 
 //Inverse of framerate in ms/frame.
 var _DOTCSS_FX_INTERVAL = 1000 / 40;
@@ -104,7 +104,7 @@ _dotcssStyleProperty.prototype.apply = Function.apply;
 _dotcssStyleProperty.prototype.call = Function.call;
 
 var _dotcssAnimate = function(element, jsFriendlyProp, propType, currentValue, targetValue, duration, animationStyle){
-	if(window.getComputedStyle(element)[jsFriendlyProp] != currentValue.value) return;
+	if(window.getComputedStyle(element)[jsFriendlyProp] != currentValue.value) return; //Animation can be cancelled here by setting the value directly.
 	if(duration > 0){
 		switch(propType){
 			case "color":
@@ -120,11 +120,11 @@ var _dotcssAnimate = function(element, jsFriendlyProp, propType, currentValue, t
 					//Need to rectify this.
 					if(currentValue.length == 0){
 						currentValue.units = targetValue.units;
-						currentValue.value = current.value.length + "" + current.value.units;
+						currentValue.value = currentValue.length + "" + currentValue.units;
 					}
 					else if(targetValue.length == 0){
 						targetValue.units = targetValue.units;
-						targetValue.value = current.value.length + "" + current.value.units;
+						targetValue.value = currentValue.length + "" + currentValue.units;
 					}
 					else{
 						//TODO: this error message gets hit when doing anything with any units other than px.
@@ -134,11 +134,14 @@ var _dotcssAnimate = function(element, jsFriendlyProp, propType, currentValue, t
 						console.warn("Couldn't animate " + jsFriendlyProp + ". Inconsistent units.");
 						return;
 					}
-					dotcss(element)[jsFriendlyProp](_dotcssNumberStep(currentValue.length, targetValue.length, duration, animationStyle) + current.value.units);
-					break;
+					//break;
 				}
+				
+				dotcss(element)[jsFriendlyProp](_dotcssNumberStep(currentValue.length, targetValue.length, duration, animationStyle) + currentValue.units);
+				break;
 			default:
 				//Most things cannot be animated. However, if the current and target values are numbers, it can be animated.
+				
 				if(!isNaN(currentValue.value) && !isNaN(targetValue.value)){
 					dotcss(element)[jsFriendlyProp](_dotcssNumberStep(Number(currentValue.value), Number(targetValue.value), duration, animationStyle));
 				}
@@ -164,10 +167,11 @@ var _dotcssNumberStep = function(start, target, timeRemaining, style){
 		case "geometric":
 		case "exponential":
 			var m = Math.exp(-_DOTCSS_FX_INTERVAL / timeRemaining);
-			return  target + m * (start - target);
+			return  Number(target) + m * (start - target);
 		case "linear":
 		default:
-			return start + _DOTCSS_FX_INTERVAL * (target - start) / timeRemaining;
+			console.log(timeRemaining);
+			return Number(start) + _DOTCSS_FX_INTERVAL * (target - start) / timeRemaining;
 	}
 }
 
@@ -696,7 +700,7 @@ function _convertStyleIntoDotCssObject(value, cssDataType){
 			var numberPart = "";
 			var unitPart = "";
 			for(var i = 0; i < value.length; i++){
-				if(unitPart.length > 0 || isNaN(value[i])){
+				if(unitPart.length > 0 || (value[i] != "-" && value[i] != "+" && value[i] != "." && isNaN(value[i]))){
 					unitPart += value[i];
 				}
 				else{
