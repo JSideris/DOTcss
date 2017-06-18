@@ -1,4 +1,4 @@
-//Version 0.2 Beta.
+//Version 0.3 Beta.
 
 //Inverse of framerate in ms/frame.
 var _DOTCSS_FX_INTERVAL = 1000 / 40;
@@ -93,7 +93,7 @@ _dotcssStyleProperty.prototype.animate = function(value, duration, style){
 			/*switch(this.type){
 				case "color":
 			}*/
-			_dotcssAnimate(target, this.jsFriendlyProp, this.type, oldValue, newValue, duration || 400, style || "linear");
+			_dotcssAnimate(target, this.jsFriendlyProp, this.type, oldValue, newValue, duration || 400, style || "linear", 0);
 		}
 	}
 	return _dotcssLastBuilder;
@@ -103,15 +103,16 @@ _dotcssStyleProperty.prototype.animate = function(value, duration, style){
 _dotcssStyleProperty.prototype.apply = Function.apply;
 _dotcssStyleProperty.prototype.call = Function.call;
 
-var _dotcssAnimate = function(element, jsFriendlyProp, propType, currentValue, targetValue, duration, animationStyle){
+var _dotcssAnimate = function(element, jsFriendlyProp, propType, currentValue, targetValue, duration, animationStyle, progress){
+	console.log(duration);
 	if(window.getComputedStyle(element)[jsFriendlyProp] != currentValue.value) return; //Animation can be cancelled here by setting the value directly.
 	if(duration > 0){
 		switch(propType){
 			case "color":
-				var r = _dotcssNumberStep(currentValue.r, targetValue.r, duration, animationStyle );
-				var g = _dotcssNumberStep(currentValue.g, targetValue.g, duration, animationStyle );
-				var b = _dotcssNumberStep(currentValue.b, targetValue.b, duration, animationStyle );
-				var a = _dotcssNumberStep(currentValue.a, targetValue.a, duration, animationStyle );
+				var r = Math.round(_dotcssNumberStep(currentValue.r, targetValue.r, duration, progress, animationStyle));
+				var g = Math.round(_dotcssNumberStep(currentValue.g, targetValue.g, duration, progress, animationStyle ));
+				var b = Math.round(_dotcssNumberStep(currentValue.b, targetValue.b, duration, progress, animationStyle ));
+				var a = _dotcssFormatNumberValue(_dotcssNumberStep(currentValue.a, targetValue.a, duration, progress, animationStyle )); //TODO: make sure this doesn't need to be rounded or something.
 				dotcss(element)[jsFriendlyProp](r, g, b, a);
 				break;
 			case "length":
@@ -137,13 +138,13 @@ var _dotcssAnimate = function(element, jsFriendlyProp, propType, currentValue, t
 					//break;
 				}
 				
-				dotcss(element)[jsFriendlyProp](_dotcssNumberStep(currentValue.length, targetValue.length, duration, animationStyle) + currentValue.units);
+				dotcss(element)[jsFriendlyProp](_dotcssFormatNumberValue(_dotcssNumberStep(currentValue.length, targetValue.length, duration, progress, animationStyle), currentValue.units) + currentValue.units);
 				break;
 			default:
 				//Most things cannot be animated. However, if the current and target values are numbers, it can be animated.
 				
 				if(!isNaN(currentValue.value) && !isNaN(targetValue.value)){
-					dotcss(element)[jsFriendlyProp](_dotcssNumberStep(Number(currentValue.value), Number(targetValue.value), duration, animationStyle));
+					dotcss(element)[jsFriendlyProp](_dotcssFormatNumberValue(_dotcssNumberStep(Number(currentValue.value), Number(targetValue.value), duration, progress, animationStyle)));
 				}
 				else{
 					console.warn("Couldn't animate " + jsFriendlyProp + ". Not a recognizable length, color, or number.");
@@ -151,27 +152,40 @@ var _dotcssAnimate = function(element, jsFriendlyProp, propType, currentValue, t
 				}
 				break;
 		}
-		setTimeout(function(){
-			_dotcssAnimate(element, jsFriendlyProp, propType, _convertStyleIntoDotCssObject(element.style[jsFriendlyProp], propType), targetValue, Math.max(0, duration - _DOTCSS_FX_INTERVAL), animationStyle);
-		}, _DOTCSS_FX_INTERVAL);
+
+		var now = (window.performance && window.performance.now) ? window.performance.now() : null;
+		//var reachedAnimFrame = false;
+		var nextStep = function(timestamp){
+			var change = (now ? (window.performance.now() - now) : _DOTCSS_FX_INTERVAL);
+			//var change = _DOTCSS_FX_INTERVAL;
+			//reachedAnimFrame = true;
+			//console.log(change);
+			_dotcssAnimate(element, jsFriendlyProp, propType, _convertStyleIntoDotCssObject(element.style[jsFriendlyProp], propType), targetValue, Math.max(0, duration - change), animationStyle, change);
+		}
+		if(window.requestAnimationFrame) {
+			window.requestAnimationFrame(nextStep);
+			//setTimeout(function(){if(!reachedAnimFrame) console.log("ERROR");}, 100);
+		}
+		else window.setTimeout(nextStep, _DOTCSS_FX_INTERVAL);
 	}
 	else{
+		//console.log("ok");
 		dotcss(element)[jsFriendlyProp](targetValue.value); 
 	}
 }
 
 //Function that takes in a bunch of parameters and steps the start value toward the target based on timeRemaining and style.
 //Returns the result.
-var _dotcssNumberStep = function(start, target, timeRemaining, style){
+var _dotcssNumberStep = function(start, target, timeRemaining, progress, style){
 	switch(style){
 		case "geometric":
 		case "exponential":
-			var m = Math.exp(-_DOTCSS_FX_INTERVAL / timeRemaining);
+			var m = Math.exp(-(progress || _DOTCSS_FX_INTERVAL) / timeRemaining);
 			return  Number(target) + m * (start - target);
 		case "linear":
 		default:
 			console.log(timeRemaining);
-			return Number(start) + _DOTCSS_FX_INTERVAL * (target - start) / timeRemaining;
+			return Number(start) + progress * (target - start) / timeRemaining;
 	}
 }
 
@@ -240,6 +254,13 @@ var _dotcssInputToCssValue = function(args, type){
 			break;
 	}
 	return value;
+}
+
+var _dotcssFormatNumberValue = function(value, unit){
+	switch(unit){
+		case "px": return Math.round(value);
+		default: return Math.round(value * 100) / 100;
+	}
 }
 
 var _allDotCssProperties = [
@@ -707,9 +728,12 @@ function _convertStyleIntoDotCssObject(value, cssDataType){
 					numberPart += value [i];
 				}
 			}
-			return {value: value, type: cssDataType, length: numberPart, units: unitPart};
+			return {value: value, type: cssDataType, length: Number(numberPart), units: unitPart};
 		default: 
-			return {value: value, type: cssDataType};
+			if(isNaN(value)) return {value: value, type: undefined};
+			else return {value: Number(value), type: "number"};
+			
+			
 	}
 }
 
