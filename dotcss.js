@@ -1,8 +1,7 @@
 "use strict";
 
 //Latest Update.
-//Added animations for transformations.
-//Added animations for limited parameterized numeric "lists".
+// Encapsulated private functions and classes into dotcss object.
 
 //TODO: there may be an issue with memory leakage during animations.
 
