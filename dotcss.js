@@ -1094,7 +1094,7 @@ dotcss._addPropFunctionToDotCssObject = function(funcName){
 }
 
 //Takes the property and generates all the dotcss and builder functions.
-function dotcss._makeFunction (prop, jsFriendlyProp, type){
+dotcss._makeFunction = function(prop, jsFriendlyProp, type){
 	//Create the new function.
 	dotcss._Builder.prototype[jsFriendlyProp] = function(){
 		if(arguments.length == 0) return this;
