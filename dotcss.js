@@ -1,7 +1,12 @@
 "use strict";
 
 //Latest Update.
-// Encapsulated private functions and classes into dotcss object.
+// Added an "ease" transition that follows a cos curve from 0 to pi. Relpcaced exponential transition with ease.
+// Overhaul the way animations are calculated. No longer stateless, necessary for non-linear transitions.
+// Fixed a bug with perspective transforms.
+// Fixed a bug where pixels were being saved as floating point numbers.
+// Transformations will now attempt to animate as complex numbers (until I figure out how to properly decompose the 3D transformation matrix). This fixes a bug where linear rotation transitions were causing scaling.
+
 
 //TODO: there may be an issue with memory leakage during animations.
 
@@ -18,7 +23,7 @@ var dotcss = function(query){
 	return dotcss._lastBuilder;
 }
 
-dotcss.version = "0.6.0"
+dotcss.version = "0.7.0"
 
 //Inverse of framerate in ms/frame.
 dotcss._fxInterval = 1000 / 60;
@@ -232,8 +237,25 @@ dotcss._StyleProperty.prototype.animate = function(value, duration, style, compl
 		}
 		for(var i = 0; i < dotcss._lastBuilder.target.length; i++){
 			var target = dotcss._lastBuilder.target[i];
-			var oldValue = dotcss._convertStyleIntoDotCssObject(window.getComputedStyle(target)[this.jsFriendlyProp], this.type);
-			var newValue = dotcss._convertStyleIntoDotCssObject(dotcss._inputToCssValue((value instanceof Array) ? value : [value], this.type), this.type);
+			var oldValue = null;
+			var newValue = null;
+			if(this.type == "transformation"){
+				//Special handling. We'd like to consider the transformation as a complex data type first, then if that's not possible, convert it into a matrix data type.
+				//Reason being: linear transformations on matrices are inaccurate. Rotations end up scaling the target.
+				//TODO: this method sucks. Instead, decompose the transformation and animate each part properly.
+				newValue = dotcss._convertStyleIntoDotCssObject(dotcss._inputToCssValue((value instanceof Array) ? value : [value], this.type), null);
+				
+				oldValue = dotcss._convertStyleIntoDotCssObject(target.style[this.jsFriendlyProp], null);
+				
+				if(!dotcss._compareComplexDataTypes(oldValue, newValue)){
+					oldValue = null;
+					newValue = null;
+				}
+			}
+			if(!oldValue){
+				oldValue = dotcss._convertStyleIntoDotCssObject(window.getComputedStyle(target)[this.jsFriendlyProp], this.type);
+				newValue = dotcss._convertStyleIntoDotCssObject(dotcss._inputToCssValue((value instanceof Array) ? value : [value], this.type), this.type);
+			}
 			/*switch(this.type){
 				case "color":
 			}*/
@@ -264,7 +286,7 @@ dotcss._StyleProperty.prototype.animate = function(value, duration, style, compl
 			else if(this.type == "transformation"){} //OK
 			else if(oldValue.type == "number" && newValue.type == "number"){} //OK
 			else if(oldValue.type == "complex" && newValue.type == "complex"){
-				if(oldValue.numbers.length != newValue.numbers.length){ //TODO: doesn't compare parts.
+				if(!dotcss._compareComplexDataTypes(oldValue, newValue)){
 					console.warn("Couldn't animate " + this.jsFriendlyProp + ". Value mismatch.");
 					return dotcss._lastBuilder;	
 				}
@@ -274,7 +296,7 @@ dotcss._StyleProperty.prototype.animate = function(value, duration, style, compl
 				return dotcss._lastBuilder;
 			}
 
-			dotcss._animate(target, this.jsFriendlyProp, this.type, oldValue, newValue, duration || 400, style || "linear", dotcss._fxInterval, complete);
+			dotcss._animate(target, this.jsFriendlyProp, oldValue.type || this.type, oldValue, newValue, dotcss._fxInterval, duration || 400, style || "linear", complete);
 		}
 	}
 	return dotcss._lastBuilder;
@@ -284,42 +306,44 @@ dotcss._StyleProperty.prototype.animate = function(value, duration, style, compl
 dotcss._StyleProperty.prototype.apply = Function.apply;
 dotcss._StyleProperty.prototype.call = Function.call;
 
-dotcss._animate = function(element, jsFriendlyProp, propType, currentValue, targetValue, duration, animationStyle, progress, callback){
+dotcss._animate = function(element, jsFriendlyProp, propType, startValue, targetValue, currentTime, totalDuration, animationStyle, callback){
 	//FIXME: the following line won't work. Need a way to cancel animations in progress. Or not.
 	//if(window.getComputedStyle(element)[jsFriendlyProp] != currentValue.value) return; //Animation can be cancelled any time by setting the value directly.
 	//Previously, this was set up so that animations would be cancelled if the style being animated was changed outside of this recursive function.
 	//This approach had 2 problems: 1. Attempting to cancel the animation might fail if the new value happens to be the current step.
 	//2. Apparently in some browsers (tested in chrome) the element doesn't re-render if the user is in another tab, meaning the computed css gets stale and cancels the animation. 
-	if(duration > 0){
+	if(totalDuration - currentTime > 0){
 		switch(propType){
 			case "color":
-				var r = Math.round(dotcss._numberStep(currentValue.r, targetValue.r, duration, progress, animationStyle));
-				var g = Math.round(dotcss._numberStep(currentValue.g, targetValue.g, duration, progress, animationStyle ));
-				var b = Math.round(dotcss._numberStep(currentValue.b, targetValue.b, duration, progress, animationStyle ));
-				var a = dotcss.formatNumberValue(dotcss._numberStep(currentValue.a, targetValue.a, duration, progress, animationStyle )); //TODO: make sure this doesn't need to be rounded or something.
+				var r = Math.round(dotcss._numberStep(startValue.r, targetValue.r, currentTime, totalDuration, animationStyle));
+				var g = Math.round(dotcss._numberStep(startValue.g, targetValue.g, currentTime, totalDuration, animationStyle ));
+				var b = Math.round(dotcss._numberStep(startValue.b, targetValue.b, currentTime, totalDuration, animationStyle ));
+				var a = dotcss.formatNumberValue(dotcss._numberStep(startValue.a, targetValue.a, currentTime, totalDuration, animationStyle )); //TODO: make sure this doesn't need to be rounded or something.
 				dotcss(element)[jsFriendlyProp](r, g, b, a);
 				break;
 			case "length":
-				dotcss(element)[jsFriendlyProp](dotcss.formatNumberValue(dotcss._numberStep(currentValue.length, targetValue.length, duration, progress, animationStyle), currentValue.units) + currentValue.units);
+				dotcss(element)[jsFriendlyProp](dotcss.formatNumberValue(dotcss._numberStep(startValue.length, targetValue.length, currentTime, totalDuration, animationStyle), startValue.units) + startValue.units);
 				break;
 			case "transformation":
-				for(var i = 0; i < currentValue.m.length; i++){
-					currentValue.m[i] = dotcss.formatNumberValue(dotcss._numberStep(currentValue.m[i], targetValue.m[i], duration, progress, animationStyle ));
+				//TODO: this is where the problem is with rotations.
+				var newMatrix = new Array(16);
+				for(var i = 0; i < 16; i++){
+					newMatrix[i] = dotcss.formatNumberValue(dotcss._numberStep(startValue.m[i], targetValue.m[i], currentTime, totalDuration, animationStyle ));
 				}
-				dotcss(element)[jsFriendlyProp](currentValue.m);
+				dotcss(element)[jsFriendlyProp](newMatrix);
 				break;
 			default:
-				switch(currentValue.type){
+				switch(startValue.type){
 					case "number":
-						dotcss(element)[jsFriendlyProp](dotcss.formatNumberValue(dotcss._numberStep(Number(currentValue.value), Number(targetValue.value), duration, progress, animationStyle)));
+						dotcss(element)[jsFriendlyProp](dotcss.formatNumberValue(dotcss._numberStep(startValue.value, targetValue.value, currentTime, totalDuration, animationStyle)));
 						break;
 					case "complex":
 						var newVal = "";
-						for(var i = 0; i < currentValue.numbers.length; i++){
-							newVal += currentValue.parts[i];
-							newVal += dotcss.formatNumberValue(dotcss._numberStep(Number(currentValue.numbers[i]), Number(targetValue.numbers[i]), duration, progress, animationStyle))
+						for(var i = 0; i < startValue.numbers.length; i++){
+							newVal += startValue.parts[i];
+							newVal += dotcss.formatNumberValue(dotcss._numberStep(startValue.numbers[i], targetValue.numbers[i], currentTime, totalDuration, animationStyle))
 						}
-						newVal += currentValue.parts[currentValue.parts.length - 1];
+						newVal += startValue.parts[startValue.parts.length - 1];
 						
 						dotcss(element)[jsFriendlyProp](newVal);
 						break;
@@ -331,13 +355,13 @@ dotcss._animate = function(element, jsFriendlyProp, propType, currentValue, targ
 		var now = (window.performance && window.performance.now) ? window.performance.now() : null;
 		//var reachedAnimFrame = false;
 		//TODO: there could be a memory leak here. Need to investigate.
+		//Because we're creating a lot of new functions. Are they being released?
 		var nextStep = function(timestamp){
 			var change = (now ? (window.performance.now() - now) : dotcss._fxInterval);
 			//var change = dotcss._fxInterval;
 			//reachedAnimFrame = true;
 			//console.log(change);
-			//TODO: could possibly save some processing power here by using teh new set values (from above) instead of re-calculating the computed css.
-			dotcss._animate(element, jsFriendlyProp, propType, dotcss._convertStyleIntoDotCssObject(element.style[jsFriendlyProp], propType), targetValue, Math.max(0, duration - change), animationStyle, change, callback);
+			dotcss._animate(element, jsFriendlyProp, propType, startValue, targetValue, currentTime + change, totalDuration, animationStyle, callback);
 		}
 		if(window.requestAnimationFrame) {
 			window.requestAnimationFrame(nextStep);
@@ -346,23 +370,38 @@ dotcss._animate = function(element, jsFriendlyProp, propType, currentValue, targ
 		else window.setTimeout(nextStep, dotcss._fxInterval);
 	}
 	else{
+		//TODO: verify that decimal values are properly handled here.
 		dotcss(element)[jsFriendlyProp](targetValue.value);
 		if(callback) callback();
 	}
 }
 
 //Function that takes in a bunch of parameters and steps the start value toward the target based on timeRemaining and style.
+//currentValue is the current value.
+//targetValue is the target valaue.
+//timeRemaining is the time remaining in ms.
+//stepProgress is the size of this step.
+//totalDuration is the duration of the entire animation from start to finish (not just this step).
+//style is the type of transition (geometric=exponential, ease, linear).
 //Returns the result.
-dotcss._numberStep = function(start, target, timeRemaining, progress, style){
+dotcss._numberStep = function(startValue, targetValue, currentTime, totalDuration, style){
+	
+	startValue = Number(startValue);
+	targetValue = Number(targetValue);
+
+	var timeRemaining  = totalDuration - currentTime;
+
 	switch(style){
 		case "geometric":
-		case "exponential":
-			var m = Math.exp(-(progress || dotcss._fxInterval) / timeRemaining);
-			return  Number(target) + m * (start - target);
+		case "exponential"://This is kind of stupid now that we have ease. I might come back and add it in the future. For now assume ease.
+		//	var m = Math.exp(-1 / timeRemaining);
+		//	return  targetValue + m * (startValue - targetValue);
+		case "ease":
+			var m = (-Math.cos(Math.PI * (currentTime / totalDuration)) + 1) * 0.5;
+			return  startValue + m * (targetValue - startValue);
 		case "linear":
 		default:
-			//console.logconsole.log(timeRemaining);
-			return Number(start) + progress * (target - start) / timeRemaining;
+			return startValue + (targetValue - startValue) * (currentTime / totalDuration);
 	}
 }
 
@@ -388,6 +427,7 @@ dotcss._inputToCssValue = function(args, type){
 					+ Math.min(1, Math.max(0, args[3]))
 					+ ")";
 			else if(("" + value)[0] == "#" || !isNaN(("" + value).substring(1, ("" + value).length))){
+				//TODO: there is a bug here where strings like "#FFF" get misinterpreted as #000FFF (I think), instead of white.
 				if(("" + value)[0] == "#"){
 					var tryHex = ("" + value).substring(1, ("" + value).length);
 					if(tryHex.length == 3){
@@ -416,7 +456,7 @@ dotcss._inputToCssValue = function(args, type){
 			value = "";
 			for (var i = 0; i < args.length; i++){
 				if(!isNaN(args[i]))
-					value += args[i] + "px ";
+					value += Math.round(args[i]) + "px ";
 				else
 					value += args[i] + " ";
 			}
@@ -424,6 +464,10 @@ dotcss._inputToCssValue = function(args, type){
 			break;
 		case "transformation":
 			if(Object.prototype.toString.call( value ) === '[object Array]'){
+				//Let's round everything.
+				for(var i = 0; i < value.length; i++){
+					value[i] = Math.round(value[i] * 100) * 0.01;
+				}
 				if(value.length == 4) value = "matrix("+value.join(", ")+", 0, 0)";
 				else if(value.length == 6) value = "matrix(" + value.join(", ") + ")";
 				else if(value.length == 9){
@@ -1066,7 +1110,7 @@ dotcss._convertStyleIntoDotCssObject = function(value, cssDataType){
 						//Interent documentation on this feature is a little patchy. Best refer to the spec.
 						//https://www.w3.org/TR/css-transforms-1/#processing-of-perspective-transformed-boxes
 						if(p.length != 1) throw func + " must have 1 param.";
-						m = dotcss.matrixMultiply3D([1,0,0,0,0,1,0,0,0,0,1,dotcss.formatNumberValue(1 / dotcss.lengthToPx(p[0])),0,0,0,1], m);
+						m = dotcss.matrixMultiply3D([1,0,0,0,0,1,0,0,0,0,1,0,0,0,dotcss.formatNumberValue(1 / dotcss.lengthToPx(p[0])),1], m);
 						break;
 					default: 
 						throw func + " is not a translatable property.";
@@ -1079,8 +1123,18 @@ dotcss._convertStyleIntoDotCssObject = function(value, cssDataType){
 			if(isNaN(value)) return {value: value, parts: (" " + value + " ").split(dotcss._floatRegex), numbers: value.match(dotcss._floatRegex), type: "complex"}; //Numbers
 			else return {value: Number(value), type: "number"}; //Just a number.
 			
-			
 	}
+}
+
+//Ensures that two complex values match.
+dotcss._compareComplexDataTypes = function(value1, value2){
+	if(value1.type != "complex" || value2.type != "complex") return false;
+	if(value1.numbers.length != value2.numbers.length) return false;
+	if(value1.parts.length != value2.parts.length) return false;
+	for(var i = 0; i < value1.parts.length; i++){
+		if(value1.parts[i] != value2.parts[i]) return false;
+	}
+	return true;
 }
 
 //Adds a builder function directly to the dotcss object so that dotcss doesn't 
