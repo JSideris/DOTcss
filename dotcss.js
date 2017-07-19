@@ -1,9 +1,9 @@
 "use strict";
 
 //Latest Update.
-// Fixed hide and show functions to allow user to pass in animation type as second param.
-// Shrink hide now sets overflow to hidden.
-
+// Fixed bug where inconsistent units error would result in object not defined exception.
+// allow user to animate any length unit.
+// TODO: allow user to animate unit functions, such as lineHeightP.
 
 //TODO: there may be an issue with memory leakage during animations.
 
@@ -20,7 +20,7 @@ var dotcss = function(query){
 	return dotcss._lastBuilder;
 }
 
-dotcss.version = "0.7.1"
+dotcss.version = "0.8.0"
 
 //Inverse of framerate in ms/frame.
 dotcss._fxInterval = 1000 / 60;
@@ -238,6 +238,7 @@ dotcss._StyleProperty.prototype.animate = function(value, duration, style, compl
 			var target = dotcss._lastBuilder.target[i];
 			var oldValue = null;
 			var newValue = null;
+			var finalValue = null; //newValue might be in different units from the final value...
 			if(this.type == "transformation"){
 				//Special handling. We'd like to consider the transformation as a complex data type first, then if that's not possible, convert it into a matrix data type.
 				//Reason being: linear transformations on matrices are inaccurate. Rotations end up scaling the target.
@@ -255,29 +256,38 @@ dotcss._StyleProperty.prototype.animate = function(value, duration, style, compl
 				oldValue = dotcss._convertStyleIntoDotCssObject(window.getComputedStyle(target)[this.jsFriendlyProp], this.type);
 				newValue = dotcss._convertStyleIntoDotCssObject(dotcss._inputToCssValue((value instanceof Array) ? value : [value], this.type), this.type);
 			}
-			/*switch(this.type){
-				case "color":
-			}*/
+
+			finalValue = newValue;
 
 			//Do a little type/unit checking.
 			
 			if(this.type == "length"){
 				if(oldValue.units != newValue.units){
 					//Need to rectify this.
+					//This can get messy. If one of the lengths is zero, it would minimize the likelihood of an error.
 					if(oldValue.length == 0){
 						oldValue.units = newValue.units;
-						oldValue.value = oldValue.length + "" + oldValue.units;
+						oldValue.value = "0" + newValue.units;
 					}
 					else if(newValue.length == 0){
-						newValue.units = newValue.units;
-						newValue.value = oldValue.length + "" + oldValue.units;
+						newValue.units = oldValue.units;
+						newValue.value = "0" + oldValue.units;
 					}
 					else{
-						//Turns out window.calculatewhatever always gets the calculated px value.
-						//This also means we can do transitions without ever having to worry about units. Yay.
-						//Just got to figure out how.
-						console.warn("Couldn't animate " + jsFriendlyProp + ". Inconsistent units.");
-						return dotcss._lastBuilder;
+						//Things are messy. Try to mitigate. Convert the old value into the new units, as best we can.
+						var currentLengthPx = dotcss.lengthToPx(oldValue.value, this.jsFriendlyProp, target);
+						var newLengthPx = dotcss.lengthToPx(newValue.value, this.jsFriendlyProp, target);
+						//console.log("Converted " + oldValue.value + " to " + currentLengthPx + "px");
+						oldValue = {value: currentLengthPx + "px", type: oldValue.type, length: currentLengthPx, units: "px"};
+						newValue = {value: newLengthPx + "px", type: newValue.type, length: newLengthPx, units: "px"};
+						
+						//console.log("And " + finalValue.value + " to " + newValue.value);
+						//console.log(finalValue)
+						//console.log(newValue)
+
+						//Won't need this anymore.
+						//console.warn("Couldn't animate " + this.jsFriendlyProp + ". Inconsistent units.");
+						//return dotcss._lastBuilder;
 					}
 				}
 			}
@@ -295,7 +305,7 @@ dotcss._StyleProperty.prototype.animate = function(value, duration, style, compl
 				return dotcss._lastBuilder;
 			}
 
-			dotcss._animate(target, this.jsFriendlyProp, oldValue.type || this.type, oldValue, newValue, dotcss._fxInterval, duration || 400, style || "linear", complete);
+			dotcss._animate(target, this.jsFriendlyProp, oldValue.type || this.type, oldValue, newValue, finalValue, dotcss._fxInterval, duration || 400, style || "linear", complete);
 		}
 	}
 	return dotcss._lastBuilder;
@@ -305,7 +315,7 @@ dotcss._StyleProperty.prototype.animate = function(value, duration, style, compl
 dotcss._StyleProperty.prototype.apply = Function.apply;
 dotcss._StyleProperty.prototype.call = Function.call;
 
-dotcss._animate = function(element, jsFriendlyProp, propType, startValue, targetValue, currentTime, totalDuration, animationStyle, callback){
+dotcss._animate = function(element, jsFriendlyProp, propType, startValue, targetValue, finalValue, currentTime, totalDuration, animationStyle, callback){
 	//FIXME: the following line won't work. Need a way to cancel animations in progress. Or not.
 	//if(window.getComputedStyle(element)[jsFriendlyProp] != currentValue.value) return; //Animation can be cancelled any time by setting the value directly.
 	//Previously, this was set up so that animations would be cancelled if the style being animated was changed outside of this recursive function.
@@ -360,7 +370,7 @@ dotcss._animate = function(element, jsFriendlyProp, propType, startValue, target
 			//var change = dotcss._fxInterval;
 			//reachedAnimFrame = true;
 			//console.log(change);
-			dotcss._animate(element, jsFriendlyProp, propType, startValue, targetValue, currentTime + change, totalDuration, animationStyle, callback);
+			dotcss._animate(element, jsFriendlyProp, propType, startValue, targetValue, finalValue, currentTime + change, totalDuration, animationStyle, callback);
 		}
 		if(window.requestAnimationFrame) {
 			window.requestAnimationFrame(nextStep);
@@ -370,7 +380,7 @@ dotcss._animate = function(element, jsFriendlyProp, propType, startValue, target
 	}
 	else{
 		//TODO: verify that decimal values are properly handled here.
-		dotcss(element)[jsFriendlyProp](targetValue.value);
+		dotcss(element)[jsFriendlyProp](finalValue.value);
 		if(callback) callback();
 	}
 }
@@ -772,16 +782,76 @@ dotcss.angleToRad = function(a){
 	else if(a.indexOf("turn") != -1) return dotcss.formatNumberValue(Number(a.split("turn")[0]) * 2 * Math.PI);
 	else throw a + " does not have valid units for an angle."
 }
-dotcss.lengthToPx = function(l){
+dotcss.lengthToPx = function(l, prop, element){
 	l = l.trim();
-	if(l.indexOf("px") != -1) return Math.round(Number(l.split("px")[0]));
-	else if(l.indexOf("in") != -1) return Math.round(Number(l.split("in")[0]) * 96);
-	else if(l.indexOf("pt") != -1) return Math.round(Number(l.split("pt")[0]) * 96 / 72);
-	else if(l.indexOf("pc") != -1) return Math.round(Number(l.split("pc")[0]) * 16);
-	else if(l.indexOf("cm") != -1) return Math.round(Number(l.split("cm")[0]) * 96 / 2.54);
-	else if(l.indexOf("mm") != -1) return Math.round(Number(l.split("mm")[0]) * 96 / 25.4);
-	else if(l.indexOf("q") != -1) return Math.round(Number(l.split("q")[0]) * 96 / 101.6);
-	else throw l + " does not have valid units for an absolute length."
+	var R = Math.round;
+	var N = Number;
+	var S = l.split;
+	//Absolute:
+	if(l.indexOf("px") != -1) return R(N(l.split("px")[0]));
+	else if(l.indexOf("in") != -1) return R(N(l.split("in")[0]) * 96);
+	else if(l.indexOf("pt") != -1) return R(N(l.split("pt")[0]) * 96 / 72);
+	else if(l.indexOf("pc") != -1) return R(N(l.split("pc")[0]) * 16);
+	else if(l.indexOf("cm") != -1) return R(N(l.split("cm")[0]) * 96 / 2.54);
+	else if(l.indexOf("mm") != -1) return R(N(l.split("mm")[0]) * 96 / 25.4);
+	else if(l.indexOf("q") != -1) return R(N(l.split("q")[0]) * 96 / 101.6);
+	//Technically relative:
+	else if(l.indexOf("vw") != -1) return R(N(l.split("vw")[0]) * 0.01 * Math.max(document.documentElement.clientWidth, window.innerWidth || 0));
+	else if(l.indexOf("vh") != -1) return R(N(l.split("vh")[0]) * 0.01 * Math.max(document.documentElement.clientHeight, window.innerHeight || 0));
+	else if(l.indexOf("vmin") != -1) return Math.min(dotcss.lengthToPx(R(N(l.split("vmin")[0]))) + "vw", R(N(l.split("vmin")[0])) + "vx"); //I know this is slow, but it's compact, and it's not like this is a common unit.
+	else if(l.indexOf("vmax") != -1) return Math.max(dotcss.lengthToPx(R(N(l.split("vmin")[0]))) + "vw", R(N(l.split("vmin")[0])) + "vx");
+	else if(l.indexOf("rem") != -1) return R(N(l.split("rem")[0]) * dotcss.lengthToPx(window.getComputedStyle(document.body).fontSize)); //Couldn't get a stack overflow if it's a computed value. Always in px.
+
+	//Absolutely relative:
+	else if (prop && element) {
+		//If we're setting things relative to font sizes, that's easy.
+		//Can't animate ex or ch. Sorry.
+		if(l.indexOf("em") != -1) return R(N(l.split("em")[0]) * dotcss.lengthToPx(window.getComputedStyle(element).fontSize));
+
+		var ref = null;
+		switch(prop){
+			case "maxHeight":
+			case "minHeight":
+			case "top":
+			case "bottom":
+			case "height":
+				if(!element.parentNode) throw "Cannot convert " + l + " " + prop + " to px for an element that has no parent."
+				ref = dotcss.lengthToPx(window.getComputedStyle(element.parentNode).height);
+				break;
+			case "maxHidth":
+			case "minWidth":
+			case "right":
+			case "left":
+			case "width":
+			case "margin": //Yes, all padding and margins are relative to width.
+			case "marginTop":
+			case "marginBottom":
+			case "marginLeft":
+			case "marginRight":
+			case "padding":
+			case "paddingTop":
+			case "paddingBottom":
+			case "paddingLeft":
+			case "paddingRight":
+				ref = dotcss.lengthToPx(window.getComputedStyle(element.parentNode).width);
+				if(!element.parentNode) throw "Cannot convert " + l + " " + prop + " to px for an element that has no parent."
+				break;
+			case "lineHeight": //Always relative to font. Would actually be nice to be able to set this relative to container though
+				ref = dotcss.lengthToPx(window.getComputedStyle(element).fontSize);
+				break;
+			case "fontSize": //Thought this is not strictly allowed in css, we'll assume it means relative to current element's height.
+				ref = dotcss.lengthToPx(window.getComputedStyle(element).height);
+				break;
+			default:
+				throw "Unable to convert the value " + l + " to px for " + prop + ".";
+		}
+
+		if(isNaN(ref)) throw "Convert the value " + l + " to px for " + prop + " because the value it is relative to is not a number.";
+		
+		if(l.indexOf("%") != -1) return R(N(l.split("%")[0]) * 0.01 * ref);
+		else throw "The units of " + l + " are not recognized by dotcss.";
+	}
+	else throw l + " does not have valid units for an absolute length.";
 }
 
 //Returns a JSON object representation of value specific to the cssDataType passed in.
