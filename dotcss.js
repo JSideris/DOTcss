@@ -1,11 +1,8 @@
 "use strict";
 
 //Latest Update.
-// Added an "ease" transition that follows a cos curve from 0 to pi. Relpcaced exponential transition with ease.
-// Overhaul the way animations are calculated. No longer stateless, necessary for non-linear transitions.
-// Fixed a bug with perspective transforms.
-// Fixed a bug where pixels were being saved as floating point numbers.
-// Transformations will now attempt to animate as complex numbers (until I figure out how to properly decompose the 3D transformation matrix). This fixes a bug where linear rotation transitions were causing scaling.
+// Fixed hide and show functions to allow user to pass in animation type as second param.
+// Shrink hide now sets overflow to hidden.
 
 
 //TODO: there may be an issue with memory leakage during animations.
@@ -23,7 +20,7 @@ var dotcss = function(query){
 	return dotcss._lastBuilder;
 }
 
-dotcss.version = "0.7.0"
+dotcss.version = "0.7.1"
 
 //Inverse of framerate in ms/frame.
 dotcss._fxInterval = 1000 / 60;
@@ -60,9 +57,9 @@ dotcss._Builder.prototype.hide = function(){
 		//ops.opacity = arg0.opacity || null;
 		//ops.width = arg0.width || null;
 		//ops.height = arg0.height || null;
-		ops.complete = arg0.complete || (typeof arguments[1] == "function" ? arguments[1] : function(){});
+		ops.complete = arg0.complete || (typeof arguments[1] == "function" ? arguments[1] : (typeof arguments[2] == "function" ? arguments[2] : function(){}));
 		ops.hideStyle = arg0.hideStyle || "normal";
-		ops.animationStyle = arg0.animationStyle || "exponential";
+		ops.animationStyle = arg0.animationStyle || (typeof arguments[1] == "string" ? arguments[1] : "ease");
 
 		if(ops.duration > 0){
 			var doneCnt = 0;
@@ -73,18 +70,20 @@ dotcss._Builder.prototype.hide = function(){
 				var w = this.target[i].style.width;
 				var h = this.target[i].style.height;
 				var o = this.target[i].style.opacity;
+				var ov = this.target[i].style.overflow;
 				if(ops.hideStyle != "fade"){
+					this.target[i].style.overflow = "hidden";
 					m += 2;
-					(function(that, t, w, h){
+					(function(that, t, w, h, ov){
 						dotcss(t).width.animate(0, ops.duration, ops.animationStyle, function(){
-							dotcss(t).display("none").width(w);
+							dotcss(t).display("none").width(w).overflow(ov); //Restore original overflow value. Only needs to be done once.
 							doneCnt++; if(doneCnt > m * q) ops.complete(that);
 						});
 						dotcss(t).height.animate(0, ops.duration, ops.animationStyle, function(){
 							dotcss(t).display("none").height(h);
 							doneCnt++; if(doneCnt > m * q) ops.complete(that);
 						});
-					})(this, this.target[i], w, h);	
+					})(this, this.target[i], w, h, ov);	
 				}
 				if(ops.hideStyle != "shrink"){
 					(function(that, t, o){
@@ -126,9 +125,9 @@ dotcss._Builder.prototype.show = function(){
 		ops.opacity = arg0.opacity || 1;
 		ops.width = arg0.width || null;
 		ops.height = arg0.height || null;
-		ops.complete = arg0.complete || (typeof arguments[1] == "function" ? arguments[1] : function(){});
+		ops.complete = arg0.complete || (typeof arguments[1] == "function" ? arguments[1] : (typeof arguments[2] == "function" ? arguments[2] : function(){}));
 		ops.showStyle = arg0.showStyle || "normal";
-		ops.animationStyle = arg0.animationStyle || "exponential";
+		ops.animationStyle = arg0.animationStyle || (typeof arguments[1] == "string" ? arguments[1] : "ease");
 
 		if(ops.duration > 0){
 			var doneCnt = 0;
