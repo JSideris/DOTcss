@@ -1,9 +1,7 @@
 "use strict";
 
 //Latest Update.
-// Fixed bug where inconsistent units error would result in object not defined exception.
-// allow user to animate any length unit.
-// TODO: allow user to animate unit functions, such as lineHeightP.
+// ease as the default transition style.
 
 //TODO: there may be an issue with memory leakage during animations.
 
@@ -20,7 +18,7 @@ var dotcss = function(query){
 	return dotcss._lastBuilder;
 }
 
-dotcss.version = "0.8.0"
+dotcss.version = "0.8.1"
 
 //Inverse of framerate in ms/frame.
 dotcss._fxInterval = 1000 / 60;
@@ -305,7 +303,7 @@ dotcss._StyleProperty.prototype.animate = function(value, duration, style, compl
 				return dotcss._lastBuilder;
 			}
 
-			dotcss._animate(target, this.jsFriendlyProp, oldValue.type || this.type, oldValue, newValue, finalValue, dotcss._fxInterval, duration || 400, style || "linear", complete);
+			dotcss._animate(target, this.jsFriendlyProp, oldValue.type || this.type, oldValue, newValue, finalValue, dotcss._fxInterval, duration || 400, style || "ease", complete);
 		}
 	}
 	return dotcss._lastBuilder;
