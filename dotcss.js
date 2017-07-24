@@ -5,6 +5,8 @@
 // Ability to cancel animations.
 // Fixed bug where a single target with an error (e.g. unit mismatch) could cause animations to fail for multi-selector targets.
 
+// Fixed a syntax error.
+
 var dotcss = function(query){
 	//this.currentCss = "";
 
@@ -18,7 +20,7 @@ var dotcss = function(query){
 	return dotcss._lastBuilder;
 };
 
-dotcss.version = "0.9.0";
+dotcss.version = "0.9.1";
 
 //Inverse of framerate in ms/frame.
 dotcss._fxInterval = 1000 / 60;
@@ -1257,7 +1259,7 @@ dotcss._computedStyleOrActualStyle = function(element, property){
 	return window.getComputedStyle(element)[property] || element.style[property];
 };
 
-dotcss._modDeg(a) = function(){
+dotcss._modDeg = function(a){
 	if(a < 0) a = 360 - ((-a) % 360);
 	return a % 360;
 };
