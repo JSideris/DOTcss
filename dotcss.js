@@ -1,9 +1,9 @@
 "use strict";
 
 //Latest Update.
-// ease as the default transition style.
-
-//TODO: there may be an issue with memory leakage during animations.
+// Ability to animate elements not added to DOM.
+// Ability to cancel animations.
+// Fixed bug where a single target with an error (e.g. unit mismatch) could cause animations to fail for multi-selector targets.
 
 var dotcss = function(query){
 	//this.currentCss = "";
@@ -16,9 +16,9 @@ var dotcss = function(query){
 	}
 	dotcss._lastBuilder = new dotcss._Builder(target);
 	return dotcss._lastBuilder;
-}
+};
 
-dotcss.version = "0.8.1"
+dotcss.version = "0.9.0";
 
 //Inverse of framerate in ms/frame.
 dotcss._fxInterval = 1000 / 60;
@@ -30,11 +30,11 @@ dotcss._floatRegex = new RegExp("[-+]?[0-9]*\\.?[0-9]+(?:[eE][-+]?[0-9]+)?", "g"
 dotcss._Builder = function(target){
 	this.currentCss = "";
 	this.target = target;
-}
+};
 
 dotcss._Builder.prototype.toString = dotcss.prototype.toString = function(){
 	return this.currentCss;
-}
+};
 
 //Usage:
 //hide()
@@ -64,7 +64,6 @@ dotcss._Builder.prototype.hide = function(){
 			var m = 0;
 			var q = this.target.length;
 			for(var i = 0; i < this.target.length; i++){
-				//style = window.getComputedStyle(target[i]);
 				var w = this.target[i].style.width;
 				var h = this.target[i].style.height;
 				var o = this.target[i].style.opacity;
@@ -99,7 +98,7 @@ dotcss._Builder.prototype.hide = function(){
 		}
 	}
 	return this;
-}
+};
 
 //Usage:
 //show()
@@ -132,7 +131,6 @@ dotcss._Builder.prototype.show = function(){
 			var q = this.target.length;
 			var m = 0;
 			for(var i = 0; i < this.target.length; i++){
-				//style = window.getComputedStyle(target[i]);
 				
 				if(ops.showStyle != "fade"){
 					m += 2
@@ -161,7 +159,7 @@ dotcss._Builder.prototype.show = function(){
 		}
 	}
 	return this;
-}
+};
 
 dotcss._Builder.prototype.fadeOut = function(duration, complete){
 	return this.hide({
@@ -169,7 +167,7 @@ dotcss._Builder.prototype.fadeOut = function(duration, complete){
 		hideStyle: "fade",
 		complete: complete
 	});
-}
+};
 
 dotcss._Builder.prototype.fadeIn = function(duration, complete){
 	return this.show({
@@ -177,12 +175,12 @@ dotcss._Builder.prototype.fadeIn = function(duration, complete){
 		showStyle: "fade",
 		complete: complete
 	});
-}
+};
 
 dotcss._StyleProperty = function(){
 	this.type = null;
 	this.jsFriendlyProp = null;
-}
+};
 
 //toString override gets the value.
 dotcss._StyleProperty.prototype.toString = function(){
@@ -198,7 +196,7 @@ dotcss._StyleProperty.prototype.toString = function(){
 		return ret;
 	}
 	else return null;
-}
+};
 
 //val is another special function that breaks the value into a special object.
 dotcss._StyleProperty.prototype.val = function(){
@@ -215,14 +213,14 @@ dotcss._StyleProperty.prototype.val = function(){
 		}
 		else{
 			if(dotcss._lastBuilder.target[0].style[this.jsFriendlyProp]){
-				dotcss._convertStyleIntoDotCssObject(dotcss._lastBuilder.target[i].style[this.jsFriendlyProp], this.type)
+				ret = dotcss._convertStyleIntoDotCssObject(dotcss._lastBuilder.target[0].style[this.jsFriendlyProp], this.type)
 			}
 			else ret = null;
 		}
 		return ret;
 	}
 	else return null;
-}
+};
 
 //Ability to animate just like jquery.
 //complete does not get called if the animation was cancelled.
@@ -250,8 +248,14 @@ dotcss._StyleProperty.prototype.animate = function(value, duration, style, compl
 					newValue = null;
 				}
 			}
-			if(!oldValue){
-				oldValue = dotcss._convertStyleIntoDotCssObject(window.getComputedStyle(target)[this.jsFriendlyProp], this.type);
+			if(!oldValue){ //Standard. Happens when the type is not a transformation.
+				oldValue = dotcss._convertStyleIntoDotCssObject(dotcss._computedStyleOrActualStyle(target, this.jsFriendlyProp), this.type);
+				
+				if(!oldValue){ //Might still not be set. Happens if property was never set to begin with, and can't be computed. Just set it directly.
+					dotcss(target)[this.jsFriendlyProp](dotcss._inputToCssValue((value instanceof Array) ? value : [value], this.type));
+					continue;
+				}
+
 				newValue = dotcss._convertStyleIntoDotCssObject(dotcss._inputToCssValue((value instanceof Array) ? value : [value], this.type), this.type);
 			}
 
@@ -295,30 +299,27 @@ dotcss._StyleProperty.prototype.animate = function(value, duration, style, compl
 			else if(oldValue.type == "complex" && newValue.type == "complex"){
 				if(!dotcss._compareComplexDataTypes(oldValue, newValue)){
 					console.warn("Couldn't animate " + this.jsFriendlyProp + ". Value mismatch.");
-					return dotcss._lastBuilder;	
+					continue;
 				}
 			}
 			else{
 				console.warn("Couldn't animate " + this.jsFriendlyProp + ". Not a recognizable length, color, or number.");
-				return dotcss._lastBuilder;
+				continue;
 			}
 
 			dotcss._animate(target, this.jsFriendlyProp, oldValue.type || this.type, oldValue, newValue, finalValue, dotcss._fxInterval, duration || 400, style || "ease", complete);
 		}
 	}
 	return dotcss._lastBuilder;
-}
+};
 
 //Have to add these back since we're going to replace the __proto__ of a function with this new prototype.
 dotcss._StyleProperty.prototype.apply = Function.apply;
 dotcss._StyleProperty.prototype.call = Function.call;
 
-dotcss._animate = function(element, jsFriendlyProp, propType, startValue, targetValue, finalValue, currentTime, totalDuration, animationStyle, callback){
-	//FIXME: the following line won't work. Need a way to cancel animations in progress. Or not.
-	//if(window.getComputedStyle(element)[jsFriendlyProp] != currentValue.value) return; //Animation can be cancelled any time by setting the value directly.
-	//Previously, this was set up so that animations would be cancelled if the style being animated was changed outside of this recursive function.
-	//This approach had 2 problems: 1. Attempting to cancel the animation might fail if the new value happens to be the current step.
-	//2. Apparently in some browsers (tested in chrome) the element doesn't re-render if the user is in another tab, meaning the computed css gets stale and cancels the animation. 
+dotcss._animate = function(element, jsFriendlyProp, propType, startValue, targetValue, finalValue, currentTime, totalDuration, animationStyle, callback, lastValue){
+	if(lastValue && element.style[jsFriendlyProp] != lastValue) return; //Animation can be cancelled any time by setting the value directly.
+
 	if(totalDuration - currentTime > 0){
 		switch(propType){
 			case "color":
@@ -363,12 +364,10 @@ dotcss._animate = function(element, jsFriendlyProp, propType, startValue, target
 		//var reachedAnimFrame = false;
 		//TODO: there could be a memory leak here. Need to investigate.
 		//Because we're creating a lot of new functions. Are they being released?
+		var last = element.style[jsFriendlyProp];
 		var nextStep = function(timestamp){
 			var change = (now ? (window.performance.now() - now) : dotcss._fxInterval);
-			//var change = dotcss._fxInterval;
-			//reachedAnimFrame = true;
-			//console.log(change);
-			dotcss._animate(element, jsFriendlyProp, propType, startValue, targetValue, finalValue, currentTime + change, totalDuration, animationStyle, callback);
+			dotcss._animate(element, jsFriendlyProp, propType, startValue, targetValue, finalValue, currentTime + change, totalDuration, animationStyle, callback, last);
 		}
 		if(window.requestAnimationFrame) {
 			window.requestAnimationFrame(nextStep);
@@ -381,7 +380,7 @@ dotcss._animate = function(element, jsFriendlyProp, propType, startValue, target
 		dotcss(element)[jsFriendlyProp](finalValue.value);
 		if(callback) callback();
 	}
-}
+};
 
 //Function that takes in a bunch of parameters and steps the start value toward the target based on timeRemaining and style.
 //currentValue is the current value.
@@ -410,7 +409,7 @@ dotcss._numberStep = function(startValue, targetValue, currentTime, totalDuratio
 		default:
 			return startValue + (targetValue - startValue) * (currentTime / totalDuration);
 	}
-}
+};
 
 dotcss._inputToCssValue = function(args, type){
 	var value = args[0];
@@ -504,14 +503,14 @@ dotcss._inputToCssValue = function(args, type){
 			break;
 	}
 	return value;
-}
+};
 
 dotcss.formatNumberValue = function(value, unit){
 	switch(unit){
 		case "px": return Math.round(value);
 		default: return Math.round(value * 100) / 100;
 	}
-}
+};
 
 dotcss._allProperties = [
 	{prop:"color", type:"color"},
@@ -771,7 +770,7 @@ dotcss.matrixMultiply3D = function(A, B){
 			for(var i = 0; i < 4; i++)
 				ret[y + x * 4] += Number(A[y + i * 4]) * Number(B[i + x * 4]);
 	return ret;
-}
+};
 dotcss.angleToRad = function(a){
 	a = a.trim();
 	if(a.indexOf("deg") != -1) return dotcss.formatNumberValue(Number(a.split("deg")[0]) * Math.PI / 180);
@@ -779,7 +778,7 @@ dotcss.angleToRad = function(a){
 	else if(a.indexOf("rad") != -1) return dotcss.formatNumberValue(Number(a.split("rad")[0]));
 	else if(a.indexOf("turn") != -1) return dotcss.formatNumberValue(Number(a.split("turn")[0]) * 2 * Math.PI);
 	else throw a + " does not have valid units for an angle."
-}
+};
 dotcss.lengthToPx = function(l, prop, element){
 	l = l.trim();
 	var R = Math.round;
@@ -798,13 +797,13 @@ dotcss.lengthToPx = function(l, prop, element){
 	else if(l.indexOf("vh") != -1) return R(N(l.split("vh")[0]) * 0.01 * Math.max(document.documentElement.clientHeight, window.innerHeight || 0));
 	else if(l.indexOf("vmin") != -1) return Math.min(dotcss.lengthToPx(R(N(l.split("vmin")[0]))) + "vw", R(N(l.split("vmin")[0])) + "vx"); //I know this is slow, but it's compact, and it's not like this is a common unit.
 	else if(l.indexOf("vmax") != -1) return Math.max(dotcss.lengthToPx(R(N(l.split("vmin")[0]))) + "vw", R(N(l.split("vmin")[0])) + "vx");
-	else if(l.indexOf("rem") != -1) return R(N(l.split("rem")[0]) * dotcss.lengthToPx(window.getComputedStyle(document.body).fontSize)); //Couldn't get a stack overflow if it's a computed value. Always in px.
+	else if(l.indexOf("rem") != -1) return R(N(l.split("rem")[0]) * dotcss.lengthToPx(dotcss._computedStyleOrActualStyle(document.body, "fontSize"))); //Couldn't get a stack overflow if it's a computed value. Always in px.
 
 	//Absolutely relative:
 	else if (prop && element) {
 		//If we're setting things relative to font sizes, that's easy.
 		//Can't animate ex or ch. Sorry.
-		if(l.indexOf("em") != -1) return R(N(l.split("em")[0]) * dotcss.lengthToPx(window.getComputedStyle(element).fontSize));
+		if(l.indexOf("em") != -1) return R(N(l.split("em")[0]) * dotcss.lengthToPx(dotcss._computedStyleOrActualStyle(element, "fontSize")));
 
 		var ref = null;
 		switch(prop){
@@ -814,7 +813,7 @@ dotcss.lengthToPx = function(l, prop, element){
 			case "bottom":
 			case "height":
 				if(!element.parentNode) throw "Cannot convert " + l + " " + prop + " to px for an element that has no parent."
-				ref = dotcss.lengthToPx(window.getComputedStyle(element.parentNode).height);
+				ref = dotcss.lengthToPx(dotcss._computedStyleOrActualStyle(element.parentNode, "height"));
 				break;
 			case "maxHidth":
 			case "minWidth":
@@ -831,14 +830,14 @@ dotcss.lengthToPx = function(l, prop, element){
 			case "paddingBottom":
 			case "paddingLeft":
 			case "paddingRight":
-				ref = dotcss.lengthToPx(window.getComputedStyle(element.parentNode).width);
+				ref = dotcss.lengthToPx(dotcss._computedStyleOrActualStyle(element.parentNode, "width"));
 				if(!element.parentNode) throw "Cannot convert " + l + " " + prop + " to px for an element that has no parent."
 				break;
 			case "lineHeight": //Always relative to font. Would actually be nice to be able to set this relative to container though
-				ref = dotcss.lengthToPx(window.getComputedStyle(element).fontSize);
+				ref = dotcss.lengthToPx(dotcss._computedStyleOrActualStyle(element, "fontSize"));
 				break;
 			case "fontSize": //Thought this is not strictly allowed in css, we'll assume it means relative to current element's height.
-				ref = dotcss.lengthToPx(window.getComputedStyle(element).height);
+				ref = dotcss.lengthToPx(dotcss._computedStyleOrActualStyle(element, "height"));
 				break;
 			default:
 				throw "Unable to convert the value " + l + " to px for " + prop + ".";
@@ -850,7 +849,7 @@ dotcss.lengthToPx = function(l, prop, element){
 		else throw "The units of " + l + " are not recognized by dotcss.";
 	}
 	else throw l + " does not have valid units for an absolute length.";
-}
+};
 
 //Returns a JSON object representation of value specific to the cssDataType passed in.
 dotcss._convertStyleIntoDotCssObject = function(value, cssDataType){
@@ -1191,7 +1190,7 @@ dotcss._convertStyleIntoDotCssObject = function(value, cssDataType){
 			else return {value: Number(value), type: "number"}; //Just a number.
 			
 	}
-}
+};
 
 //Ensures that two complex values match.
 dotcss._compareComplexDataTypes = function(value1, value2){
@@ -1202,7 +1201,7 @@ dotcss._compareComplexDataTypes = function(value1, value2){
 		if(value1.parts[i] != value2.parts[i]) return false;
 	}
 	return true;
-}
+};
 
 //Adds a builder function directly to the dotcss object so that dotcss doesn't 
 //have to be used as a function when a target doesn't need to be specified.
@@ -1211,7 +1210,7 @@ dotcss._addPropFunctionToDotCssObject = function(funcName){
 		var n = new dotcss._Builder();
 		return n[funcName].apply(n, arguments);
 	}
-}
+};
 
 //Takes the property and generates all the dotcss and builder functions.
 dotcss._makeFunction = function(prop, jsFriendlyProp, type){
@@ -1252,24 +1251,33 @@ dotcss._makeFunction = function(prop, jsFriendlyProp, type){
 	dotcss._Builder.prototype[jsFriendlyProp].__proto__ = Object.create(dotcss._StyleProperty.prototype);
 	dotcss._Builder.prototype[jsFriendlyProp].type = type;
 	dotcss._Builder.prototype[jsFriendlyProp].jsFriendlyProp = jsFriendlyProp;
-}
+};
+
+dotcss._computedStyleOrActualStyle = function(element, property){
+	return window.getComputedStyle(element)[property] || element.style[property];
+};
+
+dotcss._modDeg(a) = function(){
+	if(a < 0) a = 360 - ((-a) % 360);
+	return a % 360;
+};
 
 //Public functions.
 
 //Special handler for building urls.
 dotcss.url = function(url){
 	return "url('" + url + "')";
-}
+};
 
 //Special handler for building rgb colors.
 dotcss.rgb = function(r, g, b){
 	return "rgb(" + r + ", " + g + ", " + b + ")";
-}
+};
 
 //Special handler for building rgba colors.
 dotcss.rgba = function(r, g, b, a){
 	return "rgba(" + r + ", " + g + ", " + b + ", " + a + ")";
-}
+};
 
 //Build dotcss.
 for(var i = 0; i < dotcss._allProperties.length; i++) dotcss._makeFunction(dotcss._allProperties[i].prop.toLowerCase(), dotcss._allProperties[i].prop.replace(new RegExp("-", "g"), ""), dotcss._allProperties[i].type);
