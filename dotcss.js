@@ -2,16 +2,10 @@
 
 //Latest Update.
 /*
-* Removed an incorrect warning message that matrix and matrix3d are standalone transformation functions.
-* Corrected a potential bug where the transform function would throw an error if provided only one value.
-* Discovered and fixed a bug where the blue channel of named colors was being set to red.
-* Efficient angle path problem fixed.
-* Complex transform blending.
-* Hash color bug fixed.
-* Ability to cancel animations.
-* Transform from nothing.
-* Transform builder.
-* Other bug fixes and enhancements.
+* Fixed color name NaN bug.
+* Re-added ability to set color to a number.
+* Fixed a bug where trying to animate rotations would sometimes throw an exception under certain conditions.
+* Got rid of redundant perspective function.
 */
 
 // Fixed a syntax error.
@@ -29,7 +23,7 @@ var dotcss = function(query){
 	return dotcss._lastBuilder;
 };
 
-dotcss.version = "0.10.0";
+dotcss.version = "0.10.1";
 
 //Inverse of framerate in ms/frame.
 dotcss._fxInterval = 1000 / 60;
@@ -219,10 +213,16 @@ dotcss._Color = function(value){
 	this.g = 0;
 	this.b = 0;
 	this.a = 1;
-
 	if(value.length == 1) {
 		value = value[0];
 		if(value == "" || value == "none" || value == "initial" || value == "inherit"){} //Nothing more needs to be done.
+		else if(!isNaN(value)){
+			this.b = value & 0xFF;
+			value >>= 8;
+			this.g = value & 0xFF;
+			value >>= 8;
+			this.r = value & 0xFF;
+		}
 		else if(value[0] == "#"){
 			var cH = value.split("#")[1];
 			if(cH.length == 3){
@@ -409,14 +409,15 @@ dotcss._Color = function(value){
 			this.b = b;
 		}
 	}
-	if(value.length == 3 || value.length == 4){
+	else if(value.length == 3 || value.length == 4){
 		this.r = value[0];
 		this.g = value[1];
 		this.b = value[2];
+		if(value.length == 4){
+			this.a = value[3];
+		}
 	}
-	if(value.length == 4){
-		this.a = value[3];
-	}
+	
 }
 
 dotcss._Color.prototype.toString = function(){
@@ -905,7 +906,10 @@ dotcss._StyleProperty.prototype.animate = function(value, duration, style, compl
 						else {
 							var filler = (transformToAdd.indexOf("scale") == -1) ? 0 : 1;
 							newTransformValues = [];
-							for(var j = 0; j < currentOldT.args.length; j++) newTransformValues.push(filler);
+							for(var j = 0; j < oldTransformValues.length; j++) newTransformValues.push(!isNaN(oldTransformValues[j]) ? filler : (
+								!isNaN(oldTransformValues[j].angle) ? new dotcss._Angle(0) : (
+									!isNaN(oldTransformValues[j].length) ? new dotcss._Length(0) : (0)
+								)));
 						}
 						oldIndex--;
 					}
@@ -922,7 +926,10 @@ dotcss._StyleProperty.prototype.animate = function(value, duration, style, compl
 						else {
 							var filler = (transformToAdd.indexOf("scale") == -1) ? 0 : 1;
 							oldTransformValues = [];
-							for(var j = 0; j < currentNewT.args.length; j++) oldTransformValues.push(filler);
+							for(var j = 0; j < newTransformValues.length; j++) oldTransformValues.push(!isNaN(newTransformValues[j]) ? filler : (
+								!isNaN(newTransformValues[j].angle) ? new dotcss._Angle(0) : (
+									!isNaN(newTransformValues[j].length) ? new dotcss._Length(0) : (0)
+								)));
 						}
 						newIndex--;
 					}
@@ -1239,7 +1246,7 @@ dotcss._allProperties = [
 	{prop:"animation-Play-State"},
 	{prop:"animation-Timing-Function"},
 	{prop:"backface-Visibility"},
-	{prop:"perspective"},
+	//{prop:"perspective"},
 	{prop:"perspective-Origin"},
 	{prop:"transform", type:"transformation"},
 	{prop:"transform-Origin"},
