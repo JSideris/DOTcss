@@ -1,13 +1,13 @@
-//Version 1.2.1.2
-//Fixed spelling of warnings function.
-//Renamed timeout
-
 function _DOT(document){
 	this._document = document;
 	this._if = null;
 	this._pendingCalls = []; //Allows you to set parent attributes from children. Also allows for jquery helper calls.
 	this._anonAttrFuncs = []; //Only to be used by top-level dot object.
+
+	this.lastNode = document ? document.lastChild : null;
 }
+
+_DOT.prototype.version = "1.3.2";
 
 _DOT.prototype._warnings = true;
 _DOT.prototype.suppressWarnings = function(){
@@ -15,7 +15,7 @@ _DOT.prototype.suppressWarnings = function(){
 };
 
 _DOT.prototype._getNewDocument = function(){
-	return document.createElement("DOCUMENT");
+	return document.createElement("DOTHTML-DOCUMENT");
 };
 
 _DOT.prototype._getAnInstance = function(){
@@ -32,6 +32,7 @@ _DOT.prototype._getLastChildOrNull = function(){
 	return null;
 };
 
+//I'm not sure if this is supported anymore.
 _DOT.prototype.getLast = function(){
 	return this._getLastChildOrNull();
 }
@@ -135,6 +136,7 @@ _DOT.prototype._appendOrCreateDocument = function(content, parentEl, beforeNode)
 			else parentEl.appendChild(eContent);
 		}
 	}
+	
 	return nd;
 	//return this;
 };
@@ -144,7 +146,6 @@ _DOT.prototype.el = function(tag, content){
 	var nDoc = this._document || this._getNewDocument();
 	nDoc.appendChild(ne);
 	this._appendOrCreateDocument(content, ne);
-	
 	return this._document === nDoc ? this : new _DOT(nDoc);
 };
 
@@ -255,7 +256,9 @@ _DOT.prototype.else = function(callback){
 };
 
 _DOT.prototype.script = function(callback){
-	return this._appendOrCreateDocument(callback);
+	//return this._appendOrCreateDocument(callback);
+	callback();
+	return this;
 };
 
 _DOT.prototype.wait = function(timeout, callback){
@@ -282,6 +285,10 @@ _DOT.prototype.empty = function(){
 	}
 	return this;
 }
+
+/*_DOT.prototype.lastNode = function(){
+	return this._document.lastChild;
+}*/
 
 _DOT.prototype.createWidget = function(name, callback){
 	_DOT.prototype[name] = function(){
@@ -770,30 +777,9 @@ _DOT.prototype.check$ = function(){
 	if(!jQuery) throw "Can't use jQuery wrappers without jQuery."
 };
 
-/*
-Not used anymore as of 1.2.
-_DOT.prototype.$append = function(target){
-	this.check$();
-	if(!target) {if (this._warnings) console.warn("Can't render to " + target); return this;}
-	var jT = jQuery(target);
-	if(jT.length == 0 && this._warnings) console.warn("No targets found for \"" + target + "\".");
-	if(this._document) jT.append(this._document.childNodes);
-	this._document = null;
-	return this;
-};
-
-_DOT.prototype.$write = function(target){
-	this.check$();
-	jQuery(target).empty();
-	this.$append(target);
-};*/
-
-//var dot;
-//var DOT = dot = new _DOT(null); //DOT is kept for legacy reasons. dot is now prefered.
-
 var dot;
 var DOT = dot = function(targetSelector){ //DOT is kept for legacy reasons. dot is now prefered.
-	var targets = document.querySelectorAll(targetSelector);
+	var targets = targetSelector instanceof NodeList ? targetSelector : ( targetSelector instanceof Node ? [targetSelector] : document.querySelectorAll(targetSelector));
 	var newDot = new _DOT();
 	if(targets.length > 0){
 		newDot._document = targets[0];

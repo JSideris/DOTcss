@@ -16,84 +16,121 @@
 <script src="dothtml.ui.js"></script>
 <script src="beautify-html.js"></script>
 
+<script src="dotcsslogo.js"></script>
+
 <body></body>
 
 <script>
 
-var cssAnimationStarted = false;
+function beautifyHtml(source) {
 
-function doRandomStuffToElement(element){
-	/*if(Math.random() < 0.9){
-		var numericFontSize = Number((element.style.fontSize || "128px").split("px")[0]);
-		numericFontSize += Math.floor(Math.random() * 2) * 2 - 1;
-		element.style.fontSize = (numericFontSize) + "px";
-	}*/
-	if(Math.random() < 0.1){
-		//dotcss(element).color(Math.random() * 127, Math.random() * 64, Math.random() * 256);
-		dotcss(element).color.animate([Math.random() * 127, Math.random() * 64, Math.random() * 256]);
-		//dotcss(element).color.animate([Math.random() * 256, Math.random() * 256, Math.random() * 256]);
-		//dotcss(element).color.animate([0, 0, 256]);
+	var opts = {};
+
+	opts.indent_size = 2;
+	opts.indent_char = " ";
+	opts.max_preserve_newlines = "0"; //Change to -1 to remove all new lines.
+	opts.preserve_newlines = opts.max_preserve_newlines !== "-1";
+	opts.keep_array_indentation = false;
+	opts.break_chained_methods = false;
+	opts.indent_scripts = "normal";
+	opts.brace_style = "collapse";
+	opts.space_before_conditional = true;
+	opts.unescape_strings = false;
+	opts.jslint_happy = false; //Don't know what this is.
+	opts.end_with_newline = false;
+	opts.wrap_line_length = 30; //Numb chars before line wrap. 0 = no wrap.
+	opts.indent_inner_html = false;
+	opts.comma_first = false;
+	opts.e4x = false;
+	
+	var source2 = "";
+	
+	for(var i = 0; i < source.length; i++){
+		switch(source[i]){
+			case "<":
+				source2 += "\r\n";
+				source2 += source[i];
+				break;
+			case ">":
+				source2 += source[i];
+				source2 += "\r\n";
+				break;
+			default: 
+				source2 += source[i];
+				break;
+		}
 	}
-	/*if(Math.random() < 0.2){
-		var bw = Math.random() * 256;
-		dotcss(element).backgroundColor.animate([bw, bw, bw, Math.random() * 0.9]);
-	}*/
-	if(Math.random() < 0.1){
-		dotcss(element).textDecoration(Math.random() < 0.1 ? "underline" : "none");
-	}
+	
+	return html_beautify(source2, opts);
 }
 
-Sequencr.do(function(){
-	if(cssAnimationStarted){
-		doRandomStuffToElement($("#logoC")[0]);
-		setTimeout(function(){doRandomStuffToElement($("#logoS1")[0]);}, 100/3);
-		setTimeout(function(){doRandomStuffToElement($("#logoS2")[0]);}, 100*2/3);
+dot.globalExampleNumber = 0; //Note: storing global widget vars inside dot is possible, but isn't standardized by any means.
+dot.createWidget("featuretutorial", function(title, description, markup, innerDotFunction, afterNotes){
+	var exampleNumb = dot.globalExampleNumber;
+	var innerDotFunctionStr = innerDotFunction.toString();
+	dot.globalExampleNumber++;
+	var outputElement = null;
+	var htmlMarkupViewer = null;
+	var markupHtml = "";
+	if(markup){
+		markupHtml = markup.toString();
 	}
-}, 100);
+	var ret = dot
+	.div(
+		dot.h3(title)
+		.p(description).style(dotcss.padding(2))
+		.div(function(){
+			var ret2 = dot
+			.div(
+				dot.if(markup, function(){
+					var ret3 = dot.div().id("example" + exampleNumb + "htmlout").style(dotcss.display("block").whiteSpace("normal").verticalAlign("top").widthP(100).padding(2));
+					htmlMarkupViewer = ret3.getLast();
+					return ret3;
+				})
+				.div(
+					dot.pre(dot.t(innerDotFunctionStr.substring((innerDotFunctionStr.indexOf("return") == 13) ? 20 : 13, innerDotFunctionStr.length - 2))).class("prettyprint linenums")
+				).style(dotcss.display("block").whiteSpace("normal").verticalAlign("top").widthP(100).padding(2))
+			).style(dotcss.display("inline-block").whiteSpace("normal").verticalAlign("top").widthP(75))
+			
+			.div(markup).id("example" + exampleNumb + "output").style(dotcss.display("inline-block").whiteSpace("normal").verticalAlign("top").widthP(25).padding(2));
+			outputElement = ret2.getLast();
+			return ret2;
+		}).style(dotcss.widthP(100).whiteSpace("nowrap"))
+		.if(afterNotes, dot.p(afterNotes).style(dotcss.padding(2).verticalAlign("top")))
+	).style(dotcss.widthP(100).border("2px solid black").padding(2));
+
+	if(markupHtml){
+		dot(htmlMarkupViewer).pre(dot.t(beautifyHtml(markupHtml)));
+		setTimeout(function(){innerDotFunction()}, 0);
+	}
+	else{
+		var result = innerDotFunction().toString().split(";").join("; ");
+		dot(outputElement).t(result);
+	}
+	var result = innerDotFunction();
+	
+
+	return ret;
+});
 
 dot("body")
-.div("&copy;2017 - Joshua Sideris").style(dotcss.position("fixed").right(10).bottom(10).color(0x9638527).lineHeight(20))
-.div(dot
-	.div(
-		dot.div("&lt;style&gt;").class("logoinittag").wait(1000, function(){
-			return dot.$hide(500);
-		})
-		.div(
-			dot.wait(1500, function(){
-				return dot.$show(300, function(){
-					return dot.wait(500, function(){
-						return dot.$animate({width: 256, height: 256, marginTop: 0}, 500, "swing", dot.h("DOT"));
-					});
-				});
-			})
-		).id("logodotsmall").style(dotcss.display("none").marginTop(80))
-		.div(dot.span("c").id("logoC").span("s").id("logoS1").span("s").id("logoS2")).id("logohtml")
-		.div("&lt;/style&gt;").class("logoinittag").wait(1000, function(){
-			return dot.$hide(500);
-		})
-	).id("logo")
-	.br()
-	.br()
-	.div("A better way to build dynamic client-side CSS.").id("slogan").$css("opacity", "0.1").wait(3000, function(){
-		cssAnimationStarted = true;
-		return dot.$animate({opacity: 1}, 500, "swing");
-	})
-).id("header")
+.div("&copy;2017 - Joshua Sideris").style(dotcss.position("fixed").right(10).bottom(10).color("#9638527").lineHeight(20))
+.div().id("header").style(dotcss.height(700).widthP(100))
 	.div(
 	dot.tabs(
 		[
 			dot.tab("DOTcss", "main",
 				dot.div(
-					dot.div("Get DOTcss.")
+					dot.div("Become a web wizard.")
 					.br()
-					.a("Download DOThtml").href("https://github.com/JSideris/DOThtml/releases/download/v1.2.0/dothtml.js").target("_blank").class("btn btn-primary download-dot-button")//.download()
+					.a("Download DOTcss").href("https://github.com/JSideris/DOTcss/releases/tag/v0.10.0").target("_blank").class("btn btn-primary download-dot-button")//.download()
 				).id("download-dot-banner")
-				.hr()
+				/*.hr()
 					.h1("DOThtml - The best open-source client-side page buider.")
 				.hr()
 					.h1("Check out a few sites built with DOThtml.")
 						.div(
-						).class("showcase-site-list")
+						).class("showcase-site-list")*/
 				//.featurepreview("", "Lots of fun to use!")
 			), 
 			dot.tab("Getting Started", "start",
@@ -101,14 +138,86 @@ dot("body")
 				.h2("Download")
 				.div(
 					dot
-					.div("Download version 1.2.0").class("btn btn-primary").style(dotcss.position("absolute").left(0).widthP(40)).onclick(function(){ window.open("https://github.com/JSideris/DOThtml/releases/download/v1.2.0/dothtml.js"); })
-					.div("Or check it out on GitHub").class("btn btn-info").style(dotcss.position("absolute").right(0).widthP(40)).onclick(function(){ window.open("https://github.com/JSideris/DOThtml")})
+					.div("Download version 0.10.0").class("btn btn-primary").style(dotcss.position("absolute").left(0).widthP(40)).onclick(function(){ window.open("https://github.com/JSideris/DOTcss/releases/tag/v0.10.0"); })
+					.div("Or check it out on GitHub").class("btn btn-info").style(dotcss.position("absolute").right(0).widthP(40)).onclick(function(){ window.open("http://jsideris.com/DOTcss")})
 				).style(dotcss.position("relative").width("100%").height(32))
-				.h2("Learn")
-				.h("Check back later for a video tutorial!.")
+				//.h2("Learn")
+				//.h("Check back later for a video tutorial!.")
 				.h2("Basic Usage")
+				.featuretutorial("Generating Styles", 
+					dot.p("DOTcss can be used to generate CSS in JavaScript. Each CSS property has a corresponding dotcss function. The functions chain together."), null,
+function(){
+return dotcss.width(100).height(100).backgroundColor("red");
+},
+					dot.p("The toString for the DOTcss builder generates css that you can assign to an element's style property. If you are a DOThtml user, you can pass this parameter right into the style function for an element.")
+				)
+				.featuretutorial("Default Units", 
+					dot.p("The default units in dotcss are pixels (and for angles, degrees). But you can use any unit you want. Either pass the full value in as a string, or use a unit suffix function."), null,
+function(){
+return dotcss.widthP(100).height(100).leftPx(25).topEm(2).maxHeight("95%");
+},
+					dot.p("DOTcss takes care of all the number formatting for you!")
+				)
+				.featuretutorial("Targetting Elements", 
+					dot.p("You can target elements by using dotcss like a function."), dot.div().id("assignment-test"),
+function(){
+dotcss("#assignment-test").width(100).height(100).backgroundColor("red");
+},
+					dot.p("Any CSS selector is allowed. Alternatively, you can pass in a Node, or an array of Nodes.")
+				)
+				.featuretutorial("Colors", 
+					dot.p("There are tons of ways to set color. DOTcss is the ultimate color mixing engine."), 
+					dot.div(1).id("color-test-1").div(2).id("color-test-2").div(3).id("color-test-3")
+					.div(4).id("color-test-4").div(5).id("color-test-5").div(6).id("color-test-6").div(7).id("color-test-7"),
+function(){
+dotcss("#color-test-1").width(100).height(100).backgroundColor("red");
+dotcss("#color-test-2").width(100).height(100).backgroundColor("#0F0");
+dotcss("#color-test-3").width(100).height(100).backgroundColor("#0000FF");
+dotcss("#color-test-4").width(100).height(100).backgroundColor(0xFFFF00);
+dotcss("#color-test-5").width(100).height(100).backgroundColor("rgb(255, 0, 255)");
+dotcss("#color-test-6").width(100).height(100).backgroundColor("rgba(0, 255, 255, 1)");
+dotcss("#color-test-7").width(100).height(100).backgroundColor(0, 0, 0, 0.5);
+},
+					dot.p("There's also color safety. You can pass in junk and it will be corrected to workable values.")
+				)
+				.featuretutorial("Transformations", 
+					dot.p("You can pass transformations right into the transform function, or you can use DOTcss' built-in transform builder."), 
+					dot.div(1).id("transform-test-1").div(2).id("transform-test-2").div(3).id("transform-test-3"),
+function(){
+dotcss("#transform-test-1").transform("rotate(15deg) skew(15deg)").width(100).height(100).margin(10).backgroundColor("red");
+dotcss("#transform-test-2").transform("rotate(15) skew(15)").width(100).height(100).margin(10).backgroundColor("green");
+dotcss("#transform-test-3").transform(dotcss.rotate(15).skew("15deg")).width(100).height(100).margin(10).backgroundColor("blue");
+},
+					dot.p("The DOTcss namespace contains all 21 of the transform functions. Calling any one of them returns a new chainable transform builder object which has a toString that renders to a list of transform functions.")
+				)
+				.featuretutorial("Animations", 
+					dot.p("DOTcss is a powerful and fast animation engine for CSS. Call the animate function on any property to animate it.")
+					.p("Nothing is off limits. You can animate lengths, colors, numbers, complex values, transformations, and more.")
+					.p("DOTcss takes care of all of the unit conversions for you. You can even animate colors by name.")
+					.p("There are also special functions for show, hide, fadeIn, and fadeOut to make life easier."), 
+					dot.button("RED").onclick("dotcss('#animation-test-box').backgroundColor.animate('red');")
+					.button("GREEN").onclick("dotcss('#animation-test-box').backgroundColor.animate('green');")
+					.button("BLUE").onclick("dotcss('#animation-test-box').backgroundColor.animate('blue');")
+					.button("BIG").onclick("dotcss('#animation-test-box').width.animate(200).height.animate(200);")
+					.button("SMALL").onclick("dotcss('#animation-test-box').width.animate(100).height.animate(100);")
+					.button("UPSIDE DOWN").onclick("dotcss('#animation-test-box').transform.animate(dotcss.rotate(180));")
+					.button("RIGHTSIDE UP").onclick("dotcss('#animation-test-box').transform.animate(dotcss.rotate(0));")
+					.button("HIDE").onclick("dotcss('#animation-test-box').hide({duration: 200, hideStyle: 'shrink'});")
+					.button("FADE IN").onclick("dotcss('#animation-test-box').fadeIn();")
+					.br().div().id("animation-test-box"),
+function(){
+dotcss("#animation-test-box").width(100).height(100).margin(10).backgroundColor("red");
+},
+					dot.p("Setting the value of a property while an animation is in progress will cancel the animation for that property if one is progressing.")
+					.p("The syntax for animate is animate(newValue, duration, style, doneCallback). Only newValue is required. Supported values for style are currently \"linear\", or \"ease\". The duration is the lenght of the animation in ms.")
+					.p("The hide and show functions have similiar syntax. hide(properties), hide(duration, style, doneCallback)), show(properties), show(duration, style, doneCallback)). If all parameters are optional. The properties object may contain the following paremetrs for hide: duration, animationStyle, hideStyle, complete, where animationStyle is the same as the style argument, and hideStyle supports the values \"fade\" and \"shrink\". The properties argument for show is similar, except instead of hideStyle, it may have a showStyle property. The show function supports two values for showStyle: \"fade\" and \"grow\".")
+				)
+
+
+
+				.br().br().br().br().br()
 				
-			),
+			)/*,
 			dot.tab("Plugins & Addons", "plugins",
 				dot.h1("This documentation is not complete yet. Please check back later!")
 			), 
@@ -135,11 +244,11 @@ dot("body")
 						return dot.div(
 							dot.div(row.name).style(dotcss.fontWeight("bold").display("inline-block").padding(8).borderRight("2px solid black").marginRight(4))
 							.each(row.versionData, function(versionDatum){
-								return dot.div(versionDatum.b + " | " + versionDatum.d).style(dotcss.fontStyle("italic").backgroundColor(0xAAFFAA).display("inline-block").padding(4).border("1px solid black"))
+								return dot.div(versionDatum.b + " | " + versionDatum.d).style(dotcss.fontStyle("italic").backgroundColor("#AAFFAA").display("inline-block").padding(4).border("1px solid black"))
 							})
 						).style(dotcss.whiteSpace("nowrap"));
 					})
-				).style(dotcss.widthP(100)/*.height(1024)*/.overflowX("scroll").backgroundColor(200, 200, 200).padding(8))
+				).style(dotcss.widthP(100).overflowX("scroll").backgroundColor(200, 200, 200).padding(8))
 
 				.h("To test DOThtml on any JavaScript-enabled browser, simply visit the <a href=\"./unittests/tests.html\" target=\"_blank\">test case page</a>.")
 
@@ -150,10 +259,18 @@ dot("body")
 			), 
 			dot.tab("Donate", "donate",
 				dot.h1("This documentation is not complete yet. Please check back later!")
-			)
+			)*/
 		]
 	)
 ).class("container");
+
+var logo = dotcssLogo("#header");
+logo.play();
+
+window.onresize = function(){
+	dotcss("#header").height(Math.min(700, window.innerHeight));
+	logo.resize();
+};
 
 </script>
 
