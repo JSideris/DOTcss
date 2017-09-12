@@ -2,10 +2,7 @@
 
 //Latest Update.
 /*
-* Fixed color name NaN bug.
-* Re-added ability to set color to a number.
-* Fixed a bug where trying to animate rotations would sometimes throw an exception under certain conditions.
-* Got rid of redundant perspective function.
+* Added ability to add to globel stylesheet.
 */
 
 // Fixed a syntax error.
