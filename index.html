@@ -107,9 +107,6 @@ dot.createWidget("featuretutorial", function(title, description, markup, innerDo
 		var result = innerDotFunction().toString().split(";").join("; ");
 		dot(outputElement).t(result);
 	}
-	var result = innerDotFunction();
-	
-
 	return ret;
 });
 
@@ -211,6 +208,16 @@ dotcss("#animation-test-box").width(100).height(100).margin(10).backgroundColor(
 					dot.p("Setting the value of a property while an animation is in progress will cancel the animation for that property if one is progressing.")
 					.p("The syntax for animate is animate(newValue, duration, style, doneCallback). Only newValue is required. Supported values for style are currently \"linear\", or \"ease\". The duration is the lenght of the animation in ms.")
 					.p("The hide and show functions have similiar syntax. hide(properties), hide(duration, style, doneCallback)), show(properties), show(duration, style, doneCallback)). If all parameters are optional. The properties object may contain the following paremetrs for hide: duration, animationStyle, hideStyle, complete, where animationStyle is the same as the style argument, and hideStyle supports the values \"fade\" and \"shrink\". The properties argument for show is similar, except instead of hideStyle, it may have a showStyle property. The show function supports two values for showStyle: \"fade\" and \"grow\".")
+				)
+				.featuretutorial("Global Style Sheet", 
+					dot.p("When you call <code>dotcss</code> as a function to target specific elements, the styles get added to those elements's style properties. This makes it impossible to use pseudo-selectors, and it doesn't work for elements created after the <code>dotcss</code> call is made.")
+					.p("If you want to use global styles or pseudoselectors, add a set of  openning and closing curly brackets to the query string, like so: <code>dotcss('a:hover{}')</code>. This will create a new <code>&lt;style&gt;</code> element in the document's head with the specified css selector."),
+					dot.button("Create Div").onclick("dot('#hover-example-out').div('Hover over me!').class('hover-example-div');").br().div().id("hover-example-out"),
+function(){
+dotcss(".hover-example-div{}").color("blue").cursor("pointer");
+dotcss(".hover-example-div:hover{}").color("red");
+},
+					dot.p("You can't use DOTcss animations in this way.")
 				)
 
 

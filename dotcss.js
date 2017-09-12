@@ -15,7 +15,15 @@ var dotcss = function(query){
 
 	var target = null;
 	if(query){
-		if(typeof query == "string" ) target = document.querySelectorAll(query);
+		if(typeof query == "string" ) {
+			if(query.indexOf("{}") == query.length - 2){
+				query = query.substring(0, query.length - 2);
+				var target = [document.createElement("style")];
+				document.head.appendChild(target[0]);
+				target[0].innerHTML = query + "{}";
+			}
+			else target = document.querySelectorAll(query);
+		};
 		if((query instanceof NodeList) || (query instanceof Array)) target = query;
 		if(query instanceof Node) target = [query]; //Doesn't need to be a NodeList. Just iterable.
 	}
@@ -23,7 +31,7 @@ var dotcss = function(query){
 	return dotcss._lastBuilder;
 };
 
-dotcss.version = "0.10.1";
+dotcss.version = "0.11.0";
 
 //Inverse of framerate in ms/frame.
 dotcss._fxInterval = 1000 / 60;
@@ -1504,7 +1512,9 @@ dotcss._makeFunction = function(prop, jsFriendlyProp, type){
 		if(this.target){
 			for(var q = 0; q < this.target.length; q++){
 				//this.target[q].style += newCss;
-				this.target[q].style[jsFriendlyProp] = value;
+				var t = this.target[q];
+				if(t.tagName == "STYLE") t.innerHTML = t.innerHTML.substring(0, t.innerHTML.length - 1) + prop + ":" + value + ";}";
+				else t.style[jsFriendlyProp] = value;
 			}
 		}
 		
