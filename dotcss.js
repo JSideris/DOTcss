@@ -3,6 +3,11 @@
 //Latest Update.
 /*
 * Added ability to add to globel stylesheet.
+* Added perspective2d property to replace perspective style which collided with the perspective transformation.
+* Fixed problem with hide function not resetting opacity.
+* Fixed bug where "" values were being interpreted as 0.
+* Fixed bug where oncomplete event was not being called for hide() function.
+* Made url data types accept comma-separeted urls.
 */
 
 // Fixed a syntax error.
@@ -28,7 +33,7 @@ var dotcss = function(query){
 	return dotcss._lastBuilder;
 };
 
-dotcss.version = "0.11.0";
+dotcss.version = "0.11.1";
 
 //Inverse of framerate in ms/frame.
 dotcss._fxInterval = 1000 / 60;
@@ -77,6 +82,7 @@ dotcss._Builder.prototype.hide = function(){
 				var w = this.target[i].style.width;
 				var h = this.target[i].style.height;
 				var o = this.target[i].style.opacity;
+				if(o === "") o = 1;
 				var ov = this.target[i].style.overflow;
 				if(ops.hideStyle != "fade"){
 					this.target[i].style.overflow = "hidden";
@@ -84,19 +90,20 @@ dotcss._Builder.prototype.hide = function(){
 					(function(that, t, w, h, ov){
 						dotcss(t).width.animate(0, ops.duration, ops.animationStyle, function(){
 							dotcss(t).display("none").width(w).overflow(ov); //Restore original overflow value. Only needs to be done once.
-							doneCnt++; if(doneCnt > m * q) ops.complete(that);
+							doneCnt++; if(doneCnt >= m * q) ops.complete(that);
 						});
 						dotcss(t).height.animate(0, ops.duration, ops.animationStyle, function(){
 							dotcss(t).display("none").height(h);
-							doneCnt++; if(doneCnt > m * q) ops.complete(that);
+							doneCnt++; if(doneCnt >= m * q) ops.complete(that);
 						});
 					})(this, this.target[i], w, h, ov);	
 				}
 				if(ops.hideStyle != "shrink"){
+					m++;
 					(function(that, t, o){
 						return dotcss(t).opacity.animate(0, ops.duration, ops.animationStyle, function(){
 							dotcss(t).display("none").opacity(o);
-							doneCnt++; if(doneCnt > m * q) ops.complete(that);
+							doneCnt++; if(doneCnt >= m * q) ops.complete(that);
 						});
 					})(this, this.target[i], o);
 				}
@@ -129,7 +136,7 @@ dotcss._Builder.prototype.show = function(){
 		var ops = {};
 		ops.duration = arg0.duration || (isNaN(arg0) ? 0 : arg0) || 0;
 		ops.display = arg0.display || "block";
-		ops.opacity = arg0.opacity || 1;
+		ops.opacity = arg0.opacity;
 		ops.width = arg0.width || null;
 		ops.height = arg0.height || null;
 		ops.complete = arg0.complete || (typeof arguments[1] == "function" ? arguments[1] : (typeof arguments[2] == "function" ? arguments[2] : function(){}));
@@ -141,7 +148,10 @@ dotcss._Builder.prototype.show = function(){
 			var q = this.target.length;
 			var m = 0;
 			for(var i = 0; i < this.target.length; i++){
-				
+				var o = ops.opacity;
+				if(ops.opacity === undefined){
+					o = parseFloat(this.target[i].style.opacity) || 1;
+				}
 				if(ops.showStyle != "fade"){
 					m += 2
 					var w = ops.width || this.target[i].style.width;
@@ -150,8 +160,8 @@ dotcss._Builder.prototype.show = function(){
 					dotcss(this.target[i]).width(0);
 					dotcss(this.target[i]).height(0);
 					// console.log(doneCnt + " " + q*m);
-					dotcss(this.target[i]).width.animate(w, ops.duration, ops.animationStyle, function(){doneCnt++; if(doneCnt == q * m) ops.complete();});
-					dotcss(this.target[i]).height.animate(h, ops.duration, ops.animationStyle, function(){doneCnt++; if(doneCnt == q * m) ops.complete();});
+					dotcss(this.target[i]).width.animate(w, ops.duration, ops.animationStyle, function(){doneCnt++; if(doneCnt >= q * m) ops.complete();});
+					dotcss(this.target[i]).height.animate(h, ops.duration, ops.animationStyle, function(){doneCnt++; if(doneCnt >= q * m) ops.complete();});
 				}
 
 				//var o = this.target[i].style.opacity; //Guess I should fade to 1?
@@ -160,7 +170,7 @@ dotcss._Builder.prototype.show = function(){
 
 				if(ops.showStyle != "grow"){
 					m++;
-					dotcss(this.target[i]).opacity.animate(ops.opacity, ops.duration, ops.animationStyle, function(){doneCnt++; if(doneCnt == q * m) ops.complete();});
+					dotcss(this.target[i]).opacity.animate(o, ops.duration, ops.animationStyle, function(){doneCnt++; if(doneCnt == q * m) ops.complete();});
 				}
 			}
 		}
@@ -191,25 +201,38 @@ dotcss._Builder.prototype.fadeIn = function(duration, complete){
 dotcss._Url = function(value){
 	this.type = "url";
 	this.url = null;
-	if(value == "" || value == "none" || value == "initial" || value == "inherit"){
+	if(!value || value.length == 0 || (value.length == 1 && value[0] == "" || value[0] == "none" || value[0] == "initial" || value[0] == "inherit")){
 		this.url = null;
 	}
-	else if(value.toLowerCase().indexOf("url") === 0){
-		var url = value.substring(indexOf("("), lastIndexOf(")")).trim();
-		if((url.indexOf("\"") && url.lastIndexOf("\"") == url.length - 1) || 
-			(url.indexOf("'") && url.lastIndexOf("'") == url.length - 1)){
-			url = url.substring(1, ret.length - 1);
-		}
-		this.url = url;
-	}
 	else{
-		this.url = value;
+		this.url = [];
+		for(var i = 0; i < value.length; i++){
+			var currentURL = "";
+			if(value[i].toLowerCase().indexOf("url") === 0){
+				var url = value[i].substring(indexOf("("), lastIndexOf(")")).trim();
+				if((url.indexOf("\"") && url.lastIndexOf("\"") == url.length - 1) || 
+					(url.indexOf("'") && url.lastIndexOf("'") == url.length - 1)){
+					url = url.substring(1, ret.length - 1);
+				}
+				this.url.push(url);
+			}
+			else{
+				this.url.push(value[i]);
+			}
+		}
 	}
 }
 
 dotcss._Url.prototype.toString = function(){
 	if(!this.url) return "none";
-	else return "url(\"" + this.url + "\")";
+	else 
+	{
+		var ret = [];
+		for(var i = 0; i < this.url.length; i++){
+			ret.push("url(\"" + this.url[i] + "\")");
+		}
+		return ret.join(", ");
+	}
 }
 
 dotcss._Color = function(value){
@@ -1251,7 +1274,7 @@ dotcss._allProperties = [
 	{prop:"animation-Play-State"},
 	{prop:"animation-Timing-Function"},
 	{prop:"backface-Visibility"},
-	//{prop:"perspective"},
+	{prop:"perspective2d"},
 	{prop:"perspective-Origin"},
 	{prop:"transform", type:"transformation"},
 	{prop:"transform-Origin"},
@@ -1463,11 +1486,15 @@ dotcss._convertStyleIntoDotCssObject = function(value, cssDataType){
 	//if(!value) return null;
 	if(!(value instanceof Array)) value = [value];
 	if(cssDataType == "color") return new dotcss._Color(value);
-	else if (cssDataType == "url") return new dotcss._Url(value[0]);
+	else if (cssDataType == "url") return new dotcss._Url(value);
 	else if (cssDataType == "length" && (!isNaN(value[0]) || (value[0].indexOf(" ") == -1 && value[0].replace(dotcss._floatRegex, "") != value[0]))) return new dotcss._Length(value[0]);
 	else if (cssDataType == "transformation") return new dotcss._Transform(value[0].toString())
 	else{
-		if(isNaN(value[0]) && ("" + value[0]).replace(dotcss._floatRegex, "") == value[0]) return new dotcss._Unknown(value[0]); //No numbers.
+		if(value[0] === "" 
+			|| (
+				(isNaN(value[0]))
+				&& ("" + value[0]).replace(dotcss._floatRegex, "") == value[0])
+			) return new dotcss._Unknown(value[0]); //No numbers.
 		if(isNaN(value[0])) return new dotcss._Complex(value[0]); //Numbers
 		else return new dotcss._Number(value[0]); //Just a number.
 	}
