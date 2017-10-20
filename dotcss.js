@@ -33,7 +33,7 @@ var dotcss = function(query){
 	return dotcss._lastBuilder;
 };
 
-dotcss.version = "0.11.1";
+dotcss.version = "0.12.0";
 
 //Inverse of framerate in ms/frame.
 dotcss._fxInterval = 1000 / 60;
