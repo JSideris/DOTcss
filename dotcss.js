@@ -5,6 +5,7 @@
 * - Wrapped code in anonymous function.
 * - Hid _Builder and _StyleProperty.
 * - Increased compatibility with IE 8, 9, and 10.
+* - Allowed 0-length animations.
 */
 
 var dotcss = null;
@@ -33,7 +34,7 @@ var dotcss = null;
 		return dotcss._lastBuilder;
 	};
 
-	dotcss.version = "0.13.0";
+	dotcss.version = "0.14.0";
 
 	//Inverse of framerate in ms/frame.
 	dotcss._fxInterval = 1000 / 60;
@@ -839,6 +840,7 @@ var dotcss = null;
 	//Ability to animate just like jquery.
 	//complete does not get called if the animation was cancelled.
 	_StyleProperty.prototype.animate = function(value, duration, style, complete){
+		duration = isNaN(duration) ? 400 : (duration || 0);
 		if(dotcss._lastBuilder && dotcss._lastBuilder.target){
 			if(!complete && style && style.call && style.apply){ //Fix params.
 				complete = style;
@@ -993,7 +995,7 @@ var dotcss = null;
 					console.warn("Couldn't animate " + this.jsFriendlyProp + ". Not a recognizable length, color, or number.");
 					continue;
 				}
-				dotcss._animate(target, this.jsFriendlyProp, oldValue.type || this.type, oldValue, newValue, finalValue, dotcss._fxInterval, duration || 400, style || "ease", complete);
+				dotcss._animate(target, this.jsFriendlyProp, oldValue.type || this.type, oldValue, newValue, finalValue, dotcss._fxInterval, duration, style || "ease", complete);
 			}
 		}
 		return dotcss._lastBuilder;
