@@ -21,12 +21,12 @@ var dotcss = null;
 			if(typeof query == "string" ) {
 				if(query.indexOf("{}") == query.length - 2){
 					query = query.substring(0, query.length - 2);
-					var target = [document.createElement("style")];
+					target = [document.createElement("style")];
 					document.head.appendChild(target[0]);
 					target[0].innerHTML = query + "{}";
 				}
 				else target = document.querySelectorAll(query);
-			};
+			}
 			if((query instanceof NodeList) || (query instanceof Array)) target = query;
 			if(query instanceof Node) target = [query]; //Doesn't need to be a NodeList. Just iterable.
 		}
@@ -46,7 +46,7 @@ var dotcss = null;
 	function _Builder(target){
 		this.currentCss = "";
 		this.target = target;
-	};
+	}
 
 	_Builder.prototype.toString = dotcss.prototype.toString = function(){
 		return this.currentCss;
@@ -154,7 +154,7 @@ var dotcss = null;
 						o = parseFloat(this.target[i].style.opacity) || 1;
 					}
 					if(ops.showStyle != "fade"){
-						m += 2
+						m += 2;
 						var w = ops.width || this.target[i].style.width;
 						var h = ops.height || this.target[i].style.height;
 						
